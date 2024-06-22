@@ -9,7 +9,10 @@
 def build(bld):
     module = bld.create_ns3_module('optical', ['core'])
     module.source = [
-        'model/optical.cc',
+        'model/optical-channel.cc',
+        'model/optical-remote-channel.cc',
+        'model/optical-net-device.cc',
+        # 'model/mems-node.cc',        
         'helper/optical-helper.cc',
         ]
 
@@ -21,7 +24,11 @@ def build(bld):
     headers = bld(features='ns3header')
     headers.module = 'optical'
     headers.source = [
-        'model/optical.h',
+        'model/optical-channel.h',
+        'model/optical-remote-channel.h',
+        'model/optical-net-device.h',
+        # 'model/mems-node.h',        
+        'model/mems-link-matrix.h',
         'helper/optical-helper.h',
         ]
 
