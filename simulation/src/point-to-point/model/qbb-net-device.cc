@@ -251,7 +251,8 @@ namespace ns3 {
 		NS_ASSERT_MSG(m_currentPkt != 0, "QbbNetDevice::TransmitComplete(): m_currentPkt zero");
 		m_phyTxEndTrace(m_currentPkt);
 		m_currentPkt = 0;
-		DequeueAndTransmit();
+        if(m_node->GetNodeType() != 2)
+		    DequeueAndTransmit();
 	}
 
 	void
@@ -381,7 +382,8 @@ namespace ns3 {
 			}
 		}else { // non-PFC packets (data, ACK, NACK, CNP...)
 			if (m_node->GetNodeType() > 0){ // switch
-				packet->AddPacketTag(FlowIdTag(m_ifIndex));
+                if(m_node->GetNodeType() == 1)
+				    packet->AddPacketTag(FlowIdTag(m_ifIndex));
 				m_node->SwitchReceiveFromDevice(this, packet, ch);
 			}else { // NIC
 				// send to RdmaHw
@@ -403,6 +405,12 @@ namespace ns3 {
 		m_traceEnqueue(packet, qIndex);
 		m_queue->Enqueue(packet, qIndex);
 		DequeueAndTransmit();
+		return true;
+	}
+
+    bool QbbNetDevice::MemsSend (Ptr<Packet> packet){
+		m_macTxTrace(packet);
+		TransmitStart(packet);
 		return true;
 	}
 

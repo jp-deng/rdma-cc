@@ -100,6 +100,7 @@ public:
    */
   virtual bool Send(Ptr<Packet> packet, const Address &dest, uint16_t protocolNumber);
   virtual bool SwitchSend (uint32_t qIndex, Ptr<Packet> packet, CustomHeader &ch);
+  virtual bool MemsSend (Ptr<Packet> packet);
 
   /**
    * Get the size of Tx buffer available in the device

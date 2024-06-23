@@ -58,4 +58,9 @@ bool NetDevice::SwitchSend (uint32_t qIndex, Ptr<Packet> packet, CustomHeader &c
 	return false;
 }
 
+bool NetDevice::MemsSend (Ptr<Packet> packet) {
+ 	printf("NetDevice::MemsSend not implemented\n");
+	return false;   
+}
+
 } // namespace ns3

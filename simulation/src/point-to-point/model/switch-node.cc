@@ -48,10 +48,6 @@ SwitchNode::SwitchNode(){
 	m_node_type = 1;
 	m_mmu = CreateObject<SwitchMmu>();
 	for (uint32_t i = 0; i < pCnt; i++)
-		for (uint32_t j = 0; j < pCnt; j++)
-			for (uint32_t k = 0; k < qCnt; k++)
-				m_bytes[i][j][k] = 0;
-	for (uint32_t i = 0; i < pCnt; i++)
 		m_txBytes[i] = 0;
 	for (uint32_t i = 0; i < pCnt; i++)
 		m_lastPktSize[i] = m_lastPktTs[i] = 0;
@@ -60,32 +56,37 @@ SwitchNode::SwitchNode(){
 }
 
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch){
-	// look up entries
-	auto entry = m_rtTable.find(ch.dip);
+    if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
+        return m_rtOpticalTable[ch.dip][0];
+    }        
+    else {    
+        // look up entries
+        auto entry = m_rtTable.find(ch.dip);
 
-	// no matching entry
-	if (entry == m_rtTable.end())
-		return -1;
+        // no matching entry
+        if (entry == m_rtTable.end())
+            return -1;
 
-	// entry found
-	auto &nexthops = entry->second;
+        // entry found
+        auto &nexthops = entry->second;
 
-	// pick one next hop based on hash
-	union {
-		uint8_t u8[4+4+2+2];
-		uint32_t u32[3];
-	} buf;
-	buf.u32[0] = ch.sip;
-	buf.u32[1] = ch.dip;
-	if (ch.l3Prot == 0x6)
-		buf.u32[2] = ch.tcp.sport | ((uint32_t)ch.tcp.dport << 16);
-	else if (ch.l3Prot == 0x11)
-		buf.u32[2] = ch.udp.sport | ((uint32_t)ch.udp.dport << 16);
-	else if (ch.l3Prot == 0xFC || ch.l3Prot == 0xFD)
-		buf.u32[2] = ch.ack.sport | ((uint32_t)ch.ack.dport << 16);
+        // pick one next hop based on hash
+        union {
+            uint8_t u8[4+4+2+2];
+            uint32_t u32[3];
+        } buf;
+        buf.u32[0] = ch.sip;
+        buf.u32[1] = ch.dip;
+        if (ch.l3Prot == 0x6)
+            buf.u32[2] = ch.tcp.sport | ((uint32_t)ch.tcp.dport << 16);
+        else if (ch.l3Prot == 0x11)
+            buf.u32[2] = ch.udp.sport | ((uint32_t)ch.udp.dport << 16);
+        else if (ch.l3Prot == 0xFC || ch.l3Prot == 0xFD)
+            buf.u32[2] = ch.ack.sport | ((uint32_t)ch.ack.dport << 16);
 
-	uint32_t idx = EcmpHash(buf.u8, 12, m_ecmpSeed) % nexthops.size();
-	return nexthops[idx];
+        uint32_t idx = EcmpHash(buf.u8, 12, m_ecmpSeed) % nexthops.size();
+        return nexthops[idx];
+    }
 }
 
 void SwitchNode::CheckAndSendPfc(uint32_t inDev, uint32_t qIndex){
@@ -129,7 +130,6 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 			}
 			CheckAndSendPfc(inDev, qIndex);
 		}
-		m_bytes[inDev][idx][qIndex] += p->GetSize();
 		m_devices[idx]->SwitchSend(qIndex, p, ch);
 	}else
 		return; // Drop
@@ -186,6 +186,15 @@ void SwitchNode::ClearTable(){
 	m_rtTable.clear();
 }
 
+void SwitchNode::AddOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx){
+	uint32_t dip = dstAddr.Get();
+	m_rtOpticalTable[dip].push_back(intf_idx);
+}
+
+void SwitchNode::ClearOpticalTable(){
+	m_rtOpticalTable.clear();
+}
+
 // This function can only be called in switch mode
 bool SwitchNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch){
 	SendToDev(packet, ch);
@@ -199,7 +208,6 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 		uint32_t inDev = t.GetFlowId();
 		m_mmu->RemoveFromIngressAdmission(inDev, qIndex, p->GetSize());
 		m_mmu->RemoveFromEgressAdmission(ifIndex, qIndex, p->GetSize());
-		m_bytes[inDev][ifIndex][qIndex] -= p->GetSize();
 		if (m_ecnEnabled){
 			bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
 			if (egressCongested){

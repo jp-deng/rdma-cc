@@ -342,6 +342,7 @@ public:
   // Yuliang
   // For switch
   virtual bool SwitchSend (uint32_t qIndex, Ptr<Packet> packet, CustomHeader &ch);
+  virtual bool MemsSend (Ptr<Packet> packet);
 };
 
 } // namespace ns3
