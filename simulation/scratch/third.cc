@@ -14,15 +14,13 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#undef PGO_TRAINING
-#define PATH_TO_PGO_CONFIG "path_to_pgo_config"
-
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
 #include <time.h> 
 #include "ns3/core-module.h"
 #include "ns3/qbb-helper.h"
+#include "ns3/optical-module.h"
 #include "ns3/point-to-point-helper.h"
 #include "ns3/applications-module.h"
 #include "ns3/internet-module.h"
@@ -104,6 +102,7 @@ struct Interface{
 
 	Interface() : idx(0), up(false){}
 };
+
 map<Ptr<Node>, map<Ptr<Node>, Interface> > nbr2if;
 // Mapping destination to next hop for each node: <node, <dest, <nexthop0, ...> > >
 map<Ptr<Node>, map<Ptr<Node>, vector<Ptr<Node> > > > nextHop;
@@ -112,6 +111,10 @@ map<Ptr<Node>, map<Ptr<Node>, uint64_t> > pairTxDelay;
 map<uint32_t, map<uint32_t, uint64_t> > pairBw;
 map<Ptr<Node>, map<Ptr<Node>, uint64_t> > pairBdp;
 map<uint32_t, map<uint32_t, uint64_t> > pairRtt;
+vector<Ptr<MemsNode>> OpticalSwitches;
+vector<Ptr<SwitchNode>> ElectricSpineSwitches;
+vector<Ptr<SwitchNode>> ElectricLeafSwitches;
+vector<Ptr<Node>> Hosts;
 
 std::vector<Ipv4Address> serverAddress;
 
@@ -220,6 +223,11 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
+void PrintProgress(Time interval) {
+    std::cout << "\033[1A\r Progress to " << Simulator::Now().GetSeconds() << " seconds simulation time" << std::endl;
+    Simulator::Schedule(interval, &PrintProgress, interval);
+}
+
 void CalculateRoute(Ptr<Node> host){
 	// queue for the BFS.
 	vector<Ptr<Node> > q;
@@ -270,8 +278,9 @@ void CalculateRoute(Ptr<Node> host){
 void CalculateRoutes(NodeContainer &n){
 	for (int i = 0; i < (int)n.GetN(); i++){
 		Ptr<Node> node = n.Get(i);
-		if (node->GetNodeType() == 0)
+		if (node->GetNodeType() == 0) {
 			CalculateRoute(node);
+        }
 	}
 }
 
@@ -290,40 +299,14 @@ void SetRoutingEntries(){
 			for (int k = 0; k < (int)nexts.size(); k++){
 				Ptr<Node> next = nexts[k];
 				uint32_t interface = nbr2if[node][next].idx;
-				if (node->GetNodeType() == 1)
-					DynamicCast<SwitchNode>(node)->AddTableEntry(dstAddr, interface);
+				if (node->GetNodeType() == 1) {
+                    DynamicCast<SwitchNode>(node)->AddTableEntry(dstAddr, interface);
+                }
 				else{
 					node->GetObject<RdmaDriver>()->m_rdma->AddTableEntry(dstAddr, interface);
 				}
 			}
 		}
-	}
-}
-
-// take down the link between a and b, and redo the routing
-void TakeDownLink(NodeContainer n, Ptr<Node> a, Ptr<Node> b){
-	if (!nbr2if[a][b].up)
-		return;
-	// take down link between a and b
-	nbr2if[a][b].up = nbr2if[b][a].up = false;
-	nextHop.clear();
-	CalculateRoutes(n);
-	// clear routing tables
-	for (uint32_t i = 0; i < n.GetN(); i++){
-		if (n.Get(i)->GetNodeType() == 1)
-			DynamicCast<SwitchNode>(n.Get(i))->ClearTable();
-		else
-			n.Get(i)->GetObject<RdmaDriver>()->m_rdma->ClearTable();
-	}
-	DynamicCast<QbbNetDevice>(a->GetDevice(nbr2if[a][b].idx))->TakeDown();
-	DynamicCast<QbbNetDevice>(b->GetDevice(nbr2if[b][a].idx))->TakeDown();
-	// reset routing table
-	SetRoutingEntries();
-
-	// redistribute qp on each host
-	for (uint32_t i = 0; i < n.GetN(); i++){
-		if (n.Get(i)->GetNodeType() == 0)
-			n.Get(i)->GetObject<RdmaDriver>()->m_rdma->RedistributeQp();
 	}
 }
 
@@ -333,23 +316,60 @@ uint64_t get_nic_rate(NodeContainer &n){
 			return DynamicCast<QbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
 }
 
+void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
+        Ptr<Node> dst = i->first;
+        if(dst->GetNodeType() == 0) {
+            Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
+            uint32_t interface = nbr2if[b][mems].idx;
+            a->AddOpticalTableEntry(dstAddr, interface);
+        }
+    }	
+}
+
+void ConfigMems(int id) {
+    Ptr<MemsNode> mems = OpticalSwitches[id];
+    if(mems->m_isDay == true) {
+        mems->m_isDay = false;        
+        for (int i = 0; i < ElectricLeafSwitches.size(); i++){
+            ElectricLeafSwitches[i]->ClearOpticalTable();
+        }
+        Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
+    }    
+    else {
+        mems->m_isDay = true;
+        mems->Reconfiguration();
+        for(int i = 0; i < mems->m_linkTable.size(); i++) {
+            Ptr<SwitchNode> a = ElectricLeafSwitches[i];
+            Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
+            CalculateOpticalRoute(a, mems, b);
+        }
+        Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
+    }
+}
+
+void InitMemsConfig() {
+    int initConfigTime = 180;
+	for (int i = 0; i < OpticalSwitches.size(); i++){
+        Ptr<MemsNode> mems = OpticalSwitches[i];
+        for(int i = 0; i < mems->m_linkTable.size(); i++) {
+            Ptr<SwitchNode> a = ElectricLeafSwitches[i];
+            Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
+            CalculateOpticalRoute(a, mems, b);
+        }
+        Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
+        initConfigTime += 50;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	clock_t begint, endt;
-	begint = clock();
-#ifndef PGO_TRAINING
-	if (argc > 1)
-#else
-	if (true)
-#endif
-	{
+	if (argc > 1){
 		//Read the configuration file
 		std::ifstream conf;
-#ifndef PGO_TRAINING
 		conf.open(argv[1]);
-#else
-		conf.open(PATH_TO_PGO_CONFIG);
-#endif
+
 		while (!conf.eof())
 		{
 			std::string key;
@@ -693,30 +713,51 @@ int main(int argc, char *argv[])
 	topof.open(topology_file.c_str());
 	flowf.open(flow_file.c_str());
 	tracef.open(trace_file.c_str());
-	uint32_t node_num, switch_num, link_num, trace_num;
-	topof >> node_num >> switch_num >> link_num;
+	uint32_t node_num, electric_switch_num, optical_switch_num, link_num, trace_num;
+	topof >> node_num >> electric_switch_num >> optical_switch_num >> link_num;
 	flowf >> flow_num;
 	tracef >> trace_num;
 
-
-	//n.Create(node_num);
 	std::vector<uint32_t> node_type(node_num, 0);
-	for (uint32_t i = 0; i < switch_num; i++)
+	for (uint32_t i = 0; i < optical_switch_num; i++)
+	{
+		uint32_t sid;
+		topof >> sid;
+		node_type[sid] = 2;
+	}    
+	for (uint32_t i = 0; i < electric_switch_num; i++)
 	{
 		uint32_t sid;
 		topof >> sid;
 		node_type[sid] = 1;
-	}
+	}    
+    uint32_t electric_switch_cnt = 0;
+    uint32_t optical_switch_cnt = 0;
 	for (uint32_t i = 0; i < node_num; i++){
-		if (node_type[i] == 0)
-			n.Add(CreateObject<Node>());
-		else{
+		if (node_type[i] == 0) {
+            Ptr<Node> host = CreateObject<Node>();
+			n.Add(host);
+            Hosts.push_back(host);
+        }
+		else if(node_type[i] == 2){
+ 			Ptr<MemsNode> osw = CreateObject<MemsNode>(optical_switch_cnt);
+			n.Add(osw);     
+            OpticalSwitches.push_back(osw);   
+            optical_switch_cnt++;    
+		}
+        else {
 			Ptr<SwitchNode> sw = CreateObject<SwitchNode>();
 			n.Add(sw);
 			sw->SetAttribute("EcnEnabled", BooleanValue(enable_qcn));
-		}
+            if(electric_switch_cnt < optical_switch_num) {
+                ElectricSpineSwitches.push_back(sw);
+            }
+            else {
+                ElectricLeafSwitches.push_back(sw);
+            }
+            electric_switch_cnt++;
+        }
 	}
-
 
 	NS_LOG_INFO("Create nodes.");
 
@@ -752,70 +793,75 @@ int main(int argc, char *argv[])
 	Ipv4AddressHelper ipv4;
 	for (uint32_t i = 0; i < link_num; i++)
 	{
+        uint32_t channelType;
 		uint32_t src, dst;
 		std::string data_rate, link_delay;
 		double error_rate;
-		topof >> src >> dst >> data_rate >> link_delay >> error_rate;
-
+		topof >> src >> dst >> data_rate >> link_delay >> error_rate >> channelType;
 		Ptr<Node> snode = n.Get(src), dnode = n.Get(dst);
 
-		qbb.SetDeviceAttribute("DataRate", StringValue(data_rate));
-		qbb.SetChannelAttribute("Delay", StringValue(link_delay));
+            qbb.SetDeviceAttribute("DataRate", StringValue(data_rate));
+            qbb.SetChannelAttribute("Delay", StringValue(link_delay));        
 
-		if (error_rate > 0)
-		{
-			Ptr<RateErrorModel> rem = CreateObject<RateErrorModel>();
-			Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable>();
-			rem->SetRandomVariable(uv);
-			uv->SetStream(50);
-			rem->SetAttribute("ErrorRate", DoubleValue(error_rate));
-			rem->SetAttribute("ErrorUnit", StringValue("ERROR_UNIT_PACKET"));
-			qbb.SetDeviceAttribute("ReceiveErrorModel", PointerValue(rem));
-		}
-		else
-		{
-			qbb.SetDeviceAttribute("ReceiveErrorModel", PointerValue(rem));
-		}
+            if (error_rate > 0)
+            {
+                Ptr<RateErrorModel> rem = CreateObject<RateErrorModel>();
+                Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable>();
+                rem->SetRandomVariable(uv);
+                uv->SetStream(50);
+                rem->SetAttribute("ErrorRate", DoubleValue(error_rate));
+                rem->SetAttribute("ErrorUnit", StringValue("ERROR_UNIT_PACKET"));
+                qbb.SetDeviceAttribute("ReceiveErrorModel", PointerValue(rem));
+            }
+            else
+            {
+                qbb.SetDeviceAttribute("ReceiveErrorModel", PointerValue(rem));
+            }
 
-		fflush(stdout);
+            fflush(stdout);
 
-		// Assigne server IP
-		// Note: this should be before the automatic assignment below (ipv4.Assign(d)),
-		// because we want our IP to be the primary IP (first in the IP address list),
-		// so that the global routing is based on our IP
-		NetDeviceContainer d = qbb.Install(snode, dnode);
-		if (snode->GetNodeType() == 0){
-			Ptr<Ipv4> ipv4 = snode->GetObject<Ipv4>();
-			ipv4->AddInterface(d.Get(0));
-			ipv4->AddAddress(1, Ipv4InterfaceAddress(serverAddress[src], Ipv4Mask(0xff000000)));
-		}
-		if (dnode->GetNodeType() == 0){
-			Ptr<Ipv4> ipv4 = dnode->GetObject<Ipv4>();
-			ipv4->AddInterface(d.Get(1));
-			ipv4->AddAddress(1, Ipv4InterfaceAddress(serverAddress[dst], Ipv4Mask(0xff000000)));
-		}
+            // Assigne server IP
+            // Note: this should be before the automatic assignment below (ipv4.Assign(d)),
+            // because we want our IP to be the primary IP (first in the IP address list),
+            // so that the global routing is based on our IP
+            NetDeviceContainer d = qbb.Install(snode, dnode);
+            if (snode->GetNodeType() == 0){
+                Ptr<Ipv4> ipv4 = snode->GetObject<Ipv4>();
+                ipv4->AddInterface(d.Get(0));
+                ipv4->AddAddress(1, Ipv4InterfaceAddress(serverAddress[src], Ipv4Mask(0xff000000)));
+            }
+            if (dnode->GetNodeType() == 0){
+                Ptr<Ipv4> ipv4 = dnode->GetObject<Ipv4>();
+                ipv4->AddInterface(d.Get(1));
+                ipv4->AddAddress(1, Ipv4InterfaceAddress(serverAddress[dst], Ipv4Mask(0xff000000)));
+            }
 
-		// used to create a graph of the topology
-		nbr2if[snode][dnode].idx = DynamicCast<QbbNetDevice>(d.Get(0))->GetIfIndex();
-		nbr2if[snode][dnode].up = true;
-		nbr2if[snode][dnode].delay = DynamicCast<QbbChannel>(DynamicCast<QbbNetDevice>(d.Get(0))->GetChannel())->GetDelay().GetTimeStep();
-		nbr2if[snode][dnode].bw = DynamicCast<QbbNetDevice>(d.Get(0))->GetDataRate().GetBitRate();
-		nbr2if[dnode][snode].idx = DynamicCast<QbbNetDevice>(d.Get(1))->GetIfIndex();
-		nbr2if[dnode][snode].up = true;
-		nbr2if[dnode][snode].delay = DynamicCast<QbbChannel>(DynamicCast<QbbNetDevice>(d.Get(1))->GetChannel())->GetDelay().GetTimeStep();
-		nbr2if[dnode][snode].bw = DynamicCast<QbbNetDevice>(d.Get(1))->GetDataRate().GetBitRate();
+            // used to create a graph of the topology
+            nbr2if[snode][dnode].idx = DynamicCast<QbbNetDevice>(d.Get(0))->GetIfIndex();
+            nbr2if[snode][dnode].delay = DynamicCast<QbbChannel>(DynamicCast<QbbNetDevice>(d.Get(0))->GetChannel())->GetDelay().GetTimeStep();
+            nbr2if[snode][dnode].bw = DynamicCast<QbbNetDevice>(d.Get(0))->GetDataRate().GetBitRate();
+            nbr2if[dnode][snode].idx = DynamicCast<QbbNetDevice>(d.Get(1))->GetIfIndex();
+            nbr2if[dnode][snode].delay = DynamicCast<QbbChannel>(DynamicCast<QbbNetDevice>(d.Get(1))->GetChannel())->GetDelay().GetTimeStep();
+            nbr2if[dnode][snode].bw = DynamicCast<QbbNetDevice>(d.Get(1))->GetDataRate().GetBitRate();
+            if(channelType == 1) {
+                nbr2if[snode][dnode].up = true;
+                nbr2if[dnode][snode].up = true;
+            }
+            else {
+                nbr2if[snode][dnode].up = false;
+                nbr2if[dnode][snode].up = false;
+            }
 
-		// This is just to set up the connectivity between nodes. The IP addresses are useless
-		char ipstring[16];
-		sprintf(ipstring, "10.%d.%d.0", i / 254 + 1, i % 254 + 1);
-		ipv4.SetBase(ipstring, "255.255.255.0");
-		ipv4.Assign(d);
+            // This is just to set up the connectivity between nodes. The IP addresses are useless
+            char ipstring[16];
+            sprintf(ipstring, "10.%d.%d.0", i / 254 + 1, i % 254 + 1);
+            ipv4.SetBase(ipstring, "255.255.255.0");
+            ipv4.Assign(d);
 
-		// setup PFC trace
-		DynamicCast<QbbNetDevice>(d.Get(0))->TraceConnectWithoutContext("QbbPfc", MakeBoundCallback (&get_pfc, pfc_file, DynamicCast<QbbNetDevice>(d.Get(0))));
-		DynamicCast<QbbNetDevice>(d.Get(1))->TraceConnectWithoutContext("QbbPfc", MakeBoundCallback (&get_pfc, pfc_file, DynamicCast<QbbNetDevice>(d.Get(1))));
+            // setup PFC trace
+            DynamicCast<QbbNetDevice>(d.Get(0))->TraceConnectWithoutContext("QbbPfc", MakeBoundCallback (&get_pfc, pfc_file, DynamicCast<QbbNetDevice>(d.Get(0))));
+            DynamicCast<QbbNetDevice>(d.Get(1))->TraceConnectWithoutContext("QbbPfc", MakeBoundCallback (&get_pfc, pfc_file, DynamicCast<QbbNetDevice>(d.Get(1))));
 	}
-
 	nic_rate = get_nic_rate(n);
 
 	// config switch
@@ -825,6 +871,8 @@ int main(int argc, char *argv[])
 			uint32_t shift = 3; // by default 1/8
 			for (uint32_t j = 1; j < sw->GetNDevices(); j++){
 				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
+                if(dev == nullptr)
+                    continue;
 				// set ecn
 				uint64_t rate = dev->GetDataRate().GetBitRate();
 				NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
@@ -835,7 +883,6 @@ int main(int argc, char *argv[])
 				uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
 				uint32_t headroom = rate * delay / 8 / 1000000000 * 3;
 				sw->m_mmu->ConfigHdrm(j, headroom);
-
 				// set pfc alpha, proportional to link bw
 				sw->m_mmu->pfc_a_shift[j] = shift;
 				while (rate > nic_rate && sw->m_mmu->pfc_a_shift[j] > 0){
@@ -903,6 +950,7 @@ int main(int argc, char *argv[])
 	// setup routing
 	CalculateRoutes(n);
 	SetRoutingEntries();
+    InitMemsConfig();
 
 	//
 	// get BDP and delay
@@ -940,40 +988,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//
-	// add trace
-	//
-
-	NodeContainer trace_nodes;
-	for (uint32_t i = 0; i < trace_num; i++)
-	{
-		uint32_t nid;
-		tracef >> nid;
-		if (nid >= n.GetN()){
-			continue;
-		}
-		trace_nodes = NodeContainer(trace_nodes, n.Get(nid));
-	}
-
-	FILE *trace_output = fopen(trace_output_file.c_str(), "w");
-	if (enable_trace)
-		qbb.EnableTracing(trace_output, trace_nodes);
-
-	// dump link speed to trace file
-	{
-		SimSetting sim_setting;
-		for (auto i: nbr2if){
-			for (auto j : i.second){
-				uint16_t node = i.first->GetId();
-				uint8_t intf = j.second.idx;
-				uint64_t bps = DynamicCast<QbbNetDevice>(i.first->GetDevice(j.second.idx))->GetDataRate().GetBitRate();
-				sim_setting.port_speed[node][intf] = bps;
-			}
-		}
-		sim_setting.win = maxBdp;
-		sim_setting.Serialize(trace_output);
-	}
-
 	Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
 	NS_LOG_INFO("Create Applications.");
@@ -998,26 +1012,24 @@ int main(int argc, char *argv[])
 	topof.close();
 	tracef.close();
 
-	// schedule link down
-	if (link_down_time > 0){
-		Simulator::Schedule(Seconds(2) + MicroSeconds(link_down_time), &TakeDownLink, n, n.Get(link_down_A), n.Get(link_down_B));
-	}
-
 	// schedule buffer monitor
 	FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");
 	Simulator::Schedule(NanoSeconds(qlen_mon_start), &monitor_buffer, qlen_output, &n);
 
+    PrintProgress(Seconds(0.001));
 	//
 	// Now, do the actual simulation.
 	//
 	std::cout << "Running Simulation.\n";
 	fflush(stdout);
 	NS_LOG_INFO("Run Simulation.");
+	begint = clock();
+
 	Simulator::Stop(Seconds(simulator_stop_time));
 	Simulator::Run();
 	Simulator::Destroy();
 	NS_LOG_INFO("Done.");
-	fclose(trace_output);
+	// fclose(trace_output);
 
 	endt = clock();
 	std::cout << (double)(endt - begint) / CLOCKS_PER_SEC << "\n";

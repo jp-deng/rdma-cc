@@ -251,8 +251,7 @@ namespace ns3 {
 		NS_ASSERT_MSG(m_currentPkt != 0, "QbbNetDevice::TransmitComplete(): m_currentPkt zero");
 		m_phyTxEndTrace(m_currentPkt);
 		m_currentPkt = 0;
-        if(m_node->GetNodeType() != 2)
-		    DequeueAndTransmit();
+        DequeueAndTransmit();
 	}
 
 	void
@@ -295,7 +294,7 @@ namespace ns3 {
 				}
 			}
 			return;
-		}else{   //switch, doesn't care about qcn, just send
+		}else if(m_node->GetNodeType() == 1){   //switch, doesn't care about qcn, just send
 			p = m_queue->DequeueRR(m_paused);		//this is round-robin
 			if (p != 0){
 				m_snifferTrace(p);
@@ -332,7 +331,12 @@ namespace ns3 {
 					}
 				}
 			}
-		}
+		}else {
+            p = m_queue->DequeueRR(m_paused);
+            if (p != 0){
+                TransmitStart(p);
+            }
+        }
 		return;
 	}
 
@@ -410,7 +414,8 @@ namespace ns3 {
 
     bool QbbNetDevice::MemsSend (Ptr<Packet> packet){
 		m_macTxTrace(packet);
-		TransmitStart(packet);
+		m_queue->Enqueue(packet, 0);
+		DequeueAndTransmit();
 		return true;
 	}
 
@@ -452,6 +457,8 @@ namespace ns3 {
 		// We need to tell the channel that we've started wiggling the wire and
 		// schedule an event that will be executed when the transmission is complete.
 		//
+        if(m_txMachineState != READY)
+            std::cout << m_node->GetId() << ": " << m_ifIndex << ": " << m_bps.CalculateTxTime(p->GetSize()) << std::endl;
 		NS_ASSERT_MSG(m_txMachineState == READY, "Must be READY to transmit");
 		m_txMachineState = BUSY;
 		m_currentPkt = p;
