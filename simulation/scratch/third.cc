@@ -78,6 +78,8 @@ uint32_t buffer_size = 16;
 
 uint32_t qlen_dump_interval = 100000000, qlen_mon_interval = 100;
 uint64_t qlen_mon_start = 2000000000, qlen_mon_end = 2100000000;
+uint64_t link_mon_start = 2000000000;
+uint64_t rate_mon_start = 2000000000, rate_mon_interval = 100;
 string qlen_mon_file;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
@@ -223,6 +225,24 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
+std::ofstream link_log("rate_log2.txt");
+
+void monitor_rate() {
+	for (uint32_t i = 0; i < n->GetN(); i++){
+		if (n->Get(i)->GetNodeType() == 1){ // is switch
+			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n->Get(i));
+			if (queue_result.find(i) == queue_result.end())
+				queue_result[i];
+			for (uint32_t j = 1; j < sw->GetNDevices(); j++){
+				uint32_t size = 0;
+				for (uint32_t k = 0; k < SwitchMmu::qCnt; k++)
+					size += sw->m_mmu->egress_bytes[j][k];
+				queue_result[i][j].add(size);
+			}
+		}
+	}    
+}
+
 void PrintProgress(Time interval) {
     std::cout << "\033[1A\r Progress to " << Simulator::Now().GetSeconds() << " seconds simulation time" << std::endl;
     Simulator::Schedule(interval, &PrintProgress, interval);
@@ -326,14 +346,19 @@ void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode
         }
     }	
 }
+std::ofstream link_log("link_log.txt");
 
 void ConfigMems(int id) {
     Ptr<MemsNode> mems = OpticalSwitches[id];
     if(mems->m_isDay == true) {
         mems->m_isDay = false;        
         for (int i = 0; i < ElectricLeafSwitches.size(); i++){
-            ElectricLeafSwitches[i]->ClearOpticalTable();
+            ElectricLeafSwitches[i]->ClearOpticalTable();        
         }
+        if(mems->m_linkTable[0] == 2) {
+            if(Simulator::Now().GetTimeStep() >= link_mon_start)
+                link_log << Simulator::Now().GetTimeStep() << std::endl; 
+        }            
         Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
     }    
     else {
@@ -342,8 +367,12 @@ void ConfigMems(int id) {
         for(int i = 0; i < mems->m_linkTable.size(); i++) {
             Ptr<SwitchNode> a = ElectricLeafSwitches[i];
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
-            CalculateOpticalRoute(a, mems, b);
+            CalculateOpticalRoute(a, mems, b);           
         }
+        if(mems->m_linkTable[0] == 2) {
+            if(Simulator::Now().GetTimeStep() >= link_mon_start)
+                link_log << Simulator::Now().GetTimeStep() << " "; 
+        }         
         Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
     }
 }
@@ -357,6 +386,10 @@ void InitMemsConfig() {
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);
         }
+        if(mems->m_linkTable[0] == 2) {
+            if(Simulator::Now().GetTimeStep() >= link_mon_start)
+                link_log << Simulator::Now().GetTimeStep() << " "; 
+        }         
         Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
         initConfigTime += 50;
 	}
@@ -1012,9 +1045,9 @@ int main(int argc, char *argv[])
 	topof.close();
 	tracef.close();
 
-	// schedule buffer monitor
-	FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");
-	Simulator::Schedule(NanoSeconds(qlen_mon_start), &monitor_buffer, qlen_output, &n);
+	// // schedule buffer monitor
+	// FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");
+	// Simulator::Schedule(NanoSeconds(qlen_mon_start), &monitor_buffer, qlen_output, &n);
 
     PrintProgress(Seconds(0.001));
 	//
