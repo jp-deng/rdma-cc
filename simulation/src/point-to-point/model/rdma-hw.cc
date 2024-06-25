@@ -12,6 +12,7 @@
 #include "ppp-header.h"
 #include "qbb-header.h"
 #include "cn-header.h"
+#include <fstream>
 
 namespace ns3{
 
@@ -611,6 +612,9 @@ void RdmaHw::ChangeRate(Ptr<RdmaQueuePair> qp, DataRate new_rate){
 	qp->m_rate = new_rate;
 }
 
+// #define IPV4CONVERT(id) Ipv4Address(0x0b000001 + ((id / 256) * 0x00010000) + ((id % 256) * 0x00000100))
+// std::ofstream rate_log("rate_log.txt");
+
 #define PRINT_LOG 0
 /******************************
  * Mellanox's version of DCQCN
@@ -674,6 +678,9 @@ void RdmaHw::CheckRateDecreaseMlx(Ptr<RdmaQueuePair> q){
 		#if PRINT_LOG
 		printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9, q->m_rate.GetBitRate() * 1e-9);
 		#endif
+        // if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+        //     rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        // }        
 	}
 }
 void RdmaHw::ScheduleDecreaseRateMlx(Ptr<RdmaQueuePair> q, uint32_t delta){
@@ -704,6 +711,9 @@ void RdmaHw::FastRecoveryMlx(Ptr<RdmaQueuePair> q){
 	#if PRINT_LOG
 	printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9, q->m_rate.GetBitRate() * 1e-9);
 	#endif
+        // if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+        //     rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        // }   
 }
 void RdmaHw::ActiveIncreaseMlx(Ptr<RdmaQueuePair> q){
 	#if PRINT_LOG
@@ -720,6 +730,9 @@ void RdmaHw::ActiveIncreaseMlx(Ptr<RdmaQueuePair> q){
 	#if PRINT_LOG
 	printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9, q->m_rate.GetBitRate() * 1e-9);
 	#endif
+        // if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+        //     rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        // }      
 }
 void RdmaHw::HyperIncreaseMlx(Ptr<RdmaQueuePair> q){
 	#if PRINT_LOG
@@ -736,6 +749,9 @@ void RdmaHw::HyperIncreaseMlx(Ptr<RdmaQueuePair> q){
 	#if PRINT_LOG
 	printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9, q->m_rate.GetBitRate() * 1e-9);
 	#endif
+        // if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+        //     rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        // }  
 }
 
 /***********************

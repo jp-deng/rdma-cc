@@ -132,12 +132,15 @@ void RdmaClient::DoDispose (void)
   Application::DoDispose ();
 }
 
+int flowCnt = 1;
 void RdmaClient::StartApplication (void)
 {
   NS_LOG_FUNCTION_NOARGS ();
   // get RDMA driver and add up queue pair
   Ptr<Node> node = GetNode();
   Ptr<RdmaDriver> rdma = node->GetObject<RdmaDriver>();
+  std::cout << flowCnt << ": " << m_sip << "--->" << m_dip << "===" << m_size << std::endl;
+  flowCnt++;
   rdma->AddQueuePair(m_size, m_pg, m_sip, m_dip, m_sport, m_dport, m_win, m_baseRtt, MakeCallback(&RdmaClient::Finish, this));
 }
 

@@ -79,7 +79,7 @@ uint32_t buffer_size = 16;
 uint32_t qlen_dump_interval = 100000000, qlen_mon_interval = 100;
 uint64_t qlen_mon_start = 2000000000, qlen_mon_end = 2100000000;
 uint64_t link_mon_start = 2000000000;
-uint64_t rate_mon_start = 2000000000, rate_mon_interval = 100;
+uint64_t rate_mon_start = 2000000000, rate_mon_interval = 10000;
 string qlen_mon_file;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
@@ -225,22 +225,19 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
-std::ofstream link_log("rate_log2.txt");
+std::ofstream rate_log("rate_log2.txt");
+#define IPV4CONVERT(id) Ipv4Address(0x0b000001 + ((id / 256) * 0x00010000) + ((id % 256) * 0x00000100))
 
 void monitor_rate() {
-	for (uint32_t i = 0; i < n->GetN(); i++){
-		if (n->Get(i)->GetNodeType() == 1){ // is switch
-			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n->Get(i));
-			if (queue_result.find(i) == queue_result.end())
-				queue_result[i];
-			for (uint32_t j = 1; j < sw->GetNDevices(); j++){
-				uint32_t size = 0;
-				for (uint32_t k = 0; k < SwitchMmu::qCnt; k++)
-					size += sw->m_mmu->egress_bytes[j][k];
-				queue_result[i][j].add(size);
-			}
-		}
-	}    
+    Ptr<Node> h = Hosts[3];
+    Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    for(int i = 0; i < qpg->GetN(); i++) {
+        Ptr<RdmaQueuePair> q = qpg->Get(i);
+        if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+            rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        }        
+    }
+    Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
 }
 
 void PrintProgress(Time interval) {
@@ -1048,6 +1045,8 @@ int main(int argc, char *argv[])
 	// // schedule buffer monitor
 	// FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");
 	// Simulator::Schedule(NanoSeconds(qlen_mon_start), &monitor_buffer, qlen_output, &n);
+
+	Simulator::Schedule(NanoSeconds(rate_mon_start), &monitor_rate);
 
     PrintProgress(Seconds(0.001));
 	//
