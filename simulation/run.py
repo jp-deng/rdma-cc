@@ -7,8 +7,8 @@ USE_DYNAMIC_PFC_THRESHOLD 1
 
 PACKET_PAYLOAD_SIZE 1000
 
-TOPOLOGY_FILE mix/{topo}.txt
-FLOW_FILE mix/{trace}.txt
+TOPOLOGY_FILE ../topology_gen/{topo}.txt
+FLOW_FILE ../traffic_gen/{trace}.txt
 TRACE_FILE mix/trace.txt
 TRACE_OUTPUT_FILE mix/mix_{topo}_{trace}_{cc}{failure}.tr
 FCT_OUTPUT_FILE mix/fct_{topo}_{trace}_{cc}{failure}.txt
@@ -63,11 +63,11 @@ QLEN_MON_END 3000000000
 """
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='run simulation')
-	parser.add_argument('--cc', dest='cc', action='store', default='hp', help="hp/dcqcn/timely/dctcp/hpccPint")
-	parser.add_argument('--trace', dest='trace', action='store', default='flow', help="the name of the flow file")
-	parser.add_argument('--bw', dest="bw", action='store', default='50', help="the NIC bandwidth")
+	parser.add_argument('--cc', dest='cc', action='store', default='dcqcn', help="hp/dcqcn/timely/dctcp/hpccPint")
+	parser.add_argument('--trace', dest='trace', action='store', default='WebSearch_0.3', help="the name of the flow file")
+	parser.add_argument('--bw', dest="bw", action='store', default='10', help="the NIC bandwidth")
 	parser.add_argument('--down', dest='down', action='store', default='0 0 0', help="link down event")
-	parser.add_argument('--topo', dest='topo', action='store', default='fat', help="the name of the topology file")
+	parser.add_argument('--topo', dest='topo', action='store', default='spine_leaf', help="the name of the topology file")
 	parser.add_argument('--utgt', dest='utgt', action='store', type=int, default=95, help="eta of HPCC")
 	parser.add_argument('--mi', dest='mi', action='store', type=int, default=0, help="MI_THRESH")
 	parser.add_argument('--hpai', dest='hpai', action='store', type=int, default=0, help="AI for HPCC")
@@ -93,9 +93,9 @@ if __name__ == "__main__":
 
 	config_name = "mix/config_%s_%s_%s%s.txt"%(topo, trace, args.cc, failure)
 
-	kmax_map = "2 %d %d %d %d"%(bw*1000000000, 400*bw/25, bw*4*1000000000, 400*bw*4/25)
-	kmin_map = "2 %d %d %d %d"%(bw*1000000000, 100*bw/25, bw*4*1000000000, 100*bw*4/25)
-	pmax_map = "2 %d %.2f %d %.2f"%(bw*1000000000, 0.2, bw*4*1000000000, 0.2)
+	kmax_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 400*bw/25, bw*25*100000000, 40*bw*25/25, bw*10*1000000000, 400*bw*10/25)
+	kmin_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 100*bw/25, bw*25*100000000, 10*bw*25/25, bw*10*1000000000, 100*bw*10/25)
+	pmax_map = "3 %d %.2f %d %.2f %d %.2f"%(bw*1000000000, 0.2, bw*25*100000000, 0.2, bw*10*1000000000, 0.2)
 	if (args.cc.startswith("dcqcn")):
 		ai = 5 * bw / 25
 		hai = 50 * bw /25
@@ -114,6 +114,8 @@ if __name__ == "__main__":
 			ai = args.hpai
 		hai = ai # useless
 		int_multi = bw / 25;
+		if int_multi == 0:
+			int_multi = 1
 		cc = "%s%d"%(args.cc, args.utgt)
 		if (mi > 0):
 			cc += "mi%d"%mi

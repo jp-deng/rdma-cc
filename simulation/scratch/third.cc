@@ -20,8 +20,7 @@
 #include <time.h> 
 #include "ns3/core-module.h"
 #include "ns3/qbb-helper.h"
-#include "ns3/optical-module.h"
-#include "ns3/point-to-point-helper.h"
+#include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/global-route-manager.h"
@@ -980,7 +979,7 @@ int main(int argc, char *argv[])
 	// setup routing
 	CalculateRoutes(n);
 	SetRoutingEntries();
-    InitMemsConfig();
+    // InitMemsConfig();
 
 	//
 	// get BDP and delay
