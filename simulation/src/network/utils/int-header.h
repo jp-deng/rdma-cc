@@ -44,16 +44,18 @@ public:
 		bytes = _bytes / (byteUnit * multi);
 		qlen = _qlen / (qlenUnit * multi);
 		switch (_rate){
+            case 10000000000lu:
+                lineRate=0;break;
 			case 25000000000lu:
-				lineRate=0;break;
-			case 50000000000lu:
 				lineRate=1;break;
-			case 100000000000lu:
+			case 50000000000lu:
 				lineRate=2;break;
-			case 200000000000lu:
+			case 100000000000lu:
 				lineRate=3;break;
-			case 400000000000lu:
+			case 200000000000lu:
 				lineRate=4;break;
+			case 400000000000lu:
+				lineRate=5;break;
 			default:
 				printf("Error: IntHeader unknown rate: %lu\n", _rate);
 				break;

@@ -121,6 +121,15 @@ public:
 	uint32_t m_lastNACK;
 	EventId QcnTimerEvent; // if destroy this rxQp, remember to cancel this timer
 
+    /***********
+	 * newcc
+	 **********/
+    DataRate m_recvRate;
+    DataRate m_fairRate;
+    Time m_lastRecvTime;
+    bool m_isFirstPkt;
+    double m_alpha;    
+
 	static TypeId GetTypeId (void);
 	RdmaRxQueuePair();
 	uint32_t GetHash(void);

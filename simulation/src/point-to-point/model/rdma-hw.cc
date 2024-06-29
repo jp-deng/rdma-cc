@@ -311,6 +311,11 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 	rxQp->m_ecn_source.total++;
 	rxQp->m_milestone_rx = m_ack_interval;
 
+    if(m_cc_mode == 6) {
+        UpdateFairRate(rxQp);
+        UpdateRecvRate(rxQp, p->GetSize());
+    }
+
 	int x = ReceiverCheckSeq(ch.udp.seq, rxQp, payload_size);
 	if (x == 1 || x == 2){ //generate ACK or NACK
 		qbbHeader seqh;
@@ -1119,4 +1124,26 @@ void RdmaHw::UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader
        }
 }
 
-}
+/**********************
+ * newcc
+ *********************/
+
+ void RdmaHw::UpdateFairRate(Ptr<RdmaRxQueuePair> rxQp) {
+    rxQp->m_fairRate = DataRate(10000000000lu / m_rxQpMap.size());
+ }
+
+ void RdmaHw::UpdateRecvRate(Ptr<RdmaRxQueuePair> rxQp, int size) {
+    if(rxQp->m_isFirstPkt) {
+        rxQp->m_isFirstPkt = false;        
+    }
+    else {
+        uint64_t bps = size * 8 * 1e9 / (Simulator::Now() - rxQp->m_lastRecvTime).GetTimeStep();
+        if(rxQp->m_recvRate == DataRate(0))
+            rxQp->m_recvRate = DataRate(bps);
+        else
+            rxQp->m_recvRate = rxQp->m_recvRate * rxQp->m_alpha + DataRate(bps) * (1 - rxQp->m_alpha);
+    }
+    rxQp->m_lastRecvTime = Simulator::Now();
+ }
+
+ }

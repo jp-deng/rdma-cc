@@ -150,6 +150,12 @@ public:
 	void SetPintSmplThresh(double p);
 	void HandleAckHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 	void UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react);
+
+	/*********************
+	 * newcc
+	 ********************/
+    void UpdateFairRate(Ptr<RdmaRxQueuePair> rxQp);   
+    void UpdateRecvRate(Ptr<RdmaRxQueuePair> rxQp, int size);
 };
 
 } /* namespace ns3 */

@@ -164,6 +164,7 @@ uint32_t ip_to_node_id(Ipv4Address ip){
 	return (ip.Get() >> 8) & 0xffff;
 }
 
+uint64_t total_fct = 0, total_flow_num = 0;
 void qp_finish(FILE* fout, Ptr<RdmaQueuePair> q){
 	uint32_t sid = ip_to_node_id(q->sip), did = ip_to_node_id(q->dip);
 	uint64_t base_rtt = pairRtt[sid][did], b = pairBw[sid][did];
@@ -173,6 +174,8 @@ void qp_finish(FILE* fout, Ptr<RdmaQueuePair> q){
 	fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct);
 	fflush(fout);
 
+    total_flow_num++;
+    total_fct += (Simulator::Now() - q->startTime).GetTimeStep();
 	// remove rxQp from the receiver
 	Ptr<Node> dstNode = n.Get(did);
 	Ptr<RdmaDriver> rdma = dstNode->GetObject<RdmaDriver> ();
@@ -1047,7 +1050,7 @@ int main(int argc, char *argv[])
 
 	Simulator::Schedule(NanoSeconds(rate_mon_start), &monitor_rate);
 
-    PrintProgress(Seconds(0.001));
+    // PrintProgress(Seconds(0.001));
 	//
 	// Now, do the actual simulation.
 	//
@@ -1063,6 +1066,7 @@ int main(int argc, char *argv[])
 	// fclose(trace_output);
 
 	endt = clock();
-	std::cout << (double)(endt - begint) / CLOCKS_PER_SEC << "\n";
-
+	std::cout << "elapsed time: " << (double)(endt - begint) / CLOCKS_PER_SEC << "\n";
+    std::cout << "total flow: " << total_flow_num << std::endl;
+    std::cout << "average fct: " << total_fct / total_flow_num << std::endl;
 }
