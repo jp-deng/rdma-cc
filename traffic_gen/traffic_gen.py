@@ -31,7 +31,7 @@ if __name__ == "__main__":
 	port = 80
 	parser = OptionParser()
 	parser.add_option("-c", "--cdf", dest = "cdf_file", help = "the file of the traffic size cdf", default = "WebSearch_distribution.txt")
-	parser.add_option("-n", "--nhost", dest = "nhost", help = "number of hosts")
+	parser.add_option("-n", "--nhost", dest = "nhost", help = "number of hosts", default = 128)
 	parser.add_option("-l", "--load", dest = "load", help = "the percentage of the traffic load to the network capacity, by default 0.3", default = "0.3")
 	parser.add_option("-b", "--bandwidth", dest = "bandwidth", help = "the bandwidth of host link (G/M/K), by default 10G", default = "10G")
 	parser.add_option("-t", "--time", dest = "time", help = "the total run time (s), by default 10", default = "0.1")

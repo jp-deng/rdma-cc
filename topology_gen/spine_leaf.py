@@ -36,7 +36,7 @@ for es in range(electric_spine_num):
     for l in range(leaf_num):
         src = host_num + optical_spine_num + es
         dst = host_num + spine_num + l
-        ofile.write("%d %d 10Gbps 1us 0 1\n"%(src, dst))
+        ofile.write("%d %d 40Gbps 1us 0 1\n"%(src, dst))
 
 # connect host and leaf
 for l in range(leaf_num):

@@ -345,7 +345,6 @@ void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode
         }
     }	
 }
-std::ofstream link_log("link_log.txt");
 
 void ConfigMems(int id) {
     Ptr<MemsNode> mems = OpticalSwitches[id];
@@ -354,10 +353,6 @@ void ConfigMems(int id) {
         for (int i = 0; i < ElectricLeafSwitches.size(); i++){
             ElectricLeafSwitches[i]->ClearOpticalTable();        
         }
-        if(mems->m_linkTable[0] == 2) {
-            if(Simulator::Now().GetTimeStep() >= link_mon_start)
-                link_log << Simulator::Now().GetTimeStep() << std::endl; 
-        }            
         Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
     }    
     else {
@@ -368,10 +363,6 @@ void ConfigMems(int id) {
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);           
         }
-        if(mems->m_linkTable[0] == 2) {
-            if(Simulator::Now().GetTimeStep() >= link_mon_start)
-                link_log << Simulator::Now().GetTimeStep() << " "; 
-        }         
         Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
     }
 }
@@ -384,11 +375,7 @@ void InitMemsConfig() {
             Ptr<SwitchNode> a = ElectricLeafSwitches[i];
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);
-        }
-        if(mems->m_linkTable[0] == 2) {
-            if(Simulator::Now().GetTimeStep() >= link_mon_start)
-                link_log << Simulator::Now().GetTimeStep() << " "; 
-        }         
+        }        
         Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
         initConfigTime += 50;
 	}
@@ -913,7 +900,7 @@ int main(int argc, char *argv[])
 				sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
 				// set pfc
 				uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
-				uint32_t headroom = rate * delay / 8 / 1000000000 * 3;
+				uint32_t headroom = rate * delay / 8 / 1000000000 * 8;
 				sw->m_mmu->ConfigHdrm(j, headroom);
 				// set pfc alpha, proportional to link bw
 				sw->m_mmu->pfc_a_shift[j] = shift;
@@ -982,7 +969,7 @@ int main(int argc, char *argv[])
 	// setup routing
 	CalculateRoutes(n);
 	SetRoutingEntries();
-    // InitMemsConfig();
+    InitMemsConfig();
 
 	//
 	// get BDP and delay
