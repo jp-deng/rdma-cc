@@ -6,7 +6,7 @@ optical_spine_num = 4
 electric_spine_num = optical_spine_num
 spine_num = optical_spine_num + electric_spine_num
 leaf_num = spine_num * 2
-per_leaf_host_num = spine_num
+per_leaf_host_num = spine_num * 2
 host_num = leaf_num * per_leaf_host_num
 
 node_num = spine_num + leaf_num + host_num

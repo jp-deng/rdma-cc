@@ -12,10 +12,11 @@ param_time=0.1
 param_cdf=WebSearch
 traffic_file="${param_cdf}_${param_load}_${param_time}.txt"
 if [ ! -f $traffic_file ]; then
-    python traffic_gen.py -c ${param_cdf}_distribution.txt -l $param_load -t $param_time -o $traffic_file
+    python traffic_gen.py -c ${param_cdf}.txt -l $param_load -t $param_time -o $traffic_file
 fi
 cd ..
 
 cd simulation
-python run.py --trace ${param_cdf}_${param_load}_${param_time} --topo spine_leaf
+param_cc=dcqcn
+python run.py --trace ${param_cdf}_${param_load}_${param_time} --topo spine_leaf --cc ${param_cc}
 cd ..

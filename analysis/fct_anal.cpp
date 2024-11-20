@@ -5,12 +5,45 @@
 #include <vector>
 #include <algorithm>
 
-int main() {
-    std::ifstream file("../simulation/mix/fct_spine_leaf_WebSearch_0.3_dcqcn.txt");  // 文件名为data.txt
+int main(int argc, char* argv[]) {
+    // 检查是否有足够的命令行参数
+    if (argc < 2) {
+        std::cerr << "请提供替换0.7的值作为命令行参数。" << std::endl;
+        return 1;
+    }
+
+    // 手动将命令行参数转换为双精度浮点数
+    double replacementValue = 0.0;
+    double decimal = 1.0;
+    bool decimalPointSeen = false;
+    const std::string argStr = argv[1];
+
+    for (size_t i = 0; i < argStr.size(); ++i) {
+        if (argStr[i] >= '0' && argStr[i] <= '9') {
+            if (decimalPointSeen) {
+                decimal /= 10.0;
+                replacementValue += (argStr[i] - '0') * decimal;
+            } else {
+                replacementValue = replacementValue * 10.0 + (argStr[i] - '0');
+            }
+        } else if (argStr[i] == '.') {
+            decimalPointSeen = true;
+        }
+    }
+
+    // 构建文件路径字符串
+    std::string filePath = "../simulation/mix/fct_spine_leaf_WebSearch_";
+    std::ostringstream oss;
+    oss << replacementValue << "_0.1_timely.txt";
+    filePath += oss.str();
+
+    // 打开文件并读取
+    std::ifstream file(filePath.c_str());
     if (!file.is_open()) {
         std::cerr << "无法打开文件！" << std::endl;
         return 1;
     }
+
     std::vector<int> fct_values;
 
     long total_fct = 0;
@@ -43,7 +76,7 @@ int main() {
         fct_values.push_back(fct);
 
         // 分类统计大流和小流的fct
-        if (packet_size >= 1 * 1024 * 1024) {  // 大流条件：数据包大小 >= 10M
+        if (packet_size >= 10 * 1024 * 1024) {  // 大流条件：数据包大小 >= 10M
             large_flow_fct += fct;
             large_flow_count++;
         } else if (packet_size <= 100 * 1024) { // 小流条件：数据包大小 <= 100K

@@ -1,65 +1,41 @@
-import subprocess
-import argparse
+def process_file(file_path):
+    all_fct = []
+    large_flow_fct = []
+    small_flow_fct = []
+    packets = []
 
-def get_pctl(a, p):
-	i = int(len(a) * p)
-	return a[i]
+    with open(file_path, 'r') as file:
+        for line in file.readlines():
+            data = line.strip().split(' ')
+            packet_size = int(data[4])
+            fct_value = float(data[6])
+
+            all_fct.append(fct_value)
+            packets.append(packet_size)
+
+            if packet_size >= 10 * 1024 * 1024:  # 10M in bytes
+                large_flow_fct.append(fct_value)
+            elif packet_size <= 100 * 1024:  # 100K in bytes
+                small_flow_fct.append(fct_value)
+
+    average_fct = sum(all_fct) / len(all_fct)
+    large_flow_average_fct = sum(large_flow_fct) / len(large_flow_fct) if large_flow_fct else 0
+    small_flow_average_fct = sum(small_flow_fct) / len(small_flow_fct) if small_flow_fct else 0
+
+    all_fct.sort()
+    index_99 = int(len(all_fct) * 0.99)
+    index_95 = int(len(all_fct) * 0.95)
+
+    fct_99 = all_fct[index_99]
+    fct_95 = all_fct[index_95]
+
+    return average_fct, large_flow_average_fct, small_flow_average_fct, fct_99, fct_95
 
 if __name__=="__main__":
-	parser = argparse.ArgumentParser(description='')
-	parser.add_argument('-p', dest='prefix', action='store', default='fct_fat', help="Specify the prefix of the fct file. Usually like fct_<topology>_<trace>")
-	parser.add_argument('-s', dest='step', action='store', default='5')
-	parser.add_argument('-t', dest='type', action='store', type=int, default=0, help="0: normal, 1: incast, 2: all")
-	parser.add_argument('-T', dest='time_limit', action='store', type=int, default=3000000000, help="only consider flows that finish before T")
-	parser.add_argument('-b', dest='bw', action='store', type=int, default=25, help="bandwidth of edge link (Gbps)")
-	args = parser.parse_args()
-
-	type = args.type
-	time_limit = args.time_limit
-
-	# Please list all the cc (together with parameters) that you want to compare.
-	# For example, here we list two CC: 1. HPCC-PINT with utgt=95,AI=50Mbps,pint_log_base=1.05,pint_prob=1; 2. HPCC with utgt=95,ai=50Mbps.
-	# For the exact naming, please check ../simulation/mix/fct_*.txt output by the simulation.
-	CCs = [
-		'hpccPint95ai50log1.05p1.000',
-		'hp95ai50',
-	]
-
-	step = int(args.step)
-	res = [[i/100.] for i in range(0, 100, step)]
-	for cc in CCs:
-		#file = "%s_%s.txt"%(args.prefix, cc)
-		file = "../simulation/mix/%s_%s.txt"%(args.prefix, cc)
-		if type == 0:
-			cmd = "cat %s"%(file)+" | awk '{if ($4==100 && $6+$7<"+"%d"%time_limit+") {slow=$7/$8;print slow<1?1:slow, $5}}' | sort -n -k 2"
-			# print cmd
-			output = subprocess.check_output(cmd, shell=True)
-		elif type == 1:
-			cmd = "cat %s"%(file)+" | awk '{if ($4==200 && $6+$7<"+"%d"%time_limit+") {slow=$7/$8;print slow<1?1:slow, $5}}' | sort -n -k 2"
-			#print cmd
-			output = subprocess.check_output(cmd, shell=True)
-		else:
-			cmd = "cat %s"%(file)+" | awk '{$6+$7<"+"%d"%time_limit+") {slow=$7/$8;print slow<1?1:slow, $5}}' | sort -n -k 2"
-			#print cmd
-			output = subprocess.check_output(cmd, shell=True)
-
-		# up to here, `output` should be a string of multiple lines, each line is: fct, size
-		a = output.split('\n')[:-2]
-		n = len(a)
-		for i in range(0,100,step):
-			l = i * n / 100
-			r = (i+step) * n / 100
-			d = map(lambda x: [float(x.split()[0]), int(x.split()[1])], a[l:r])
-			fct=sorted(map(lambda x: x[0], d))
-			res[i/step].append(d[-1][1]) # flow size
-			#res[i/step].append(sum(fct) / len(fct)) # avg fct
-			res[i/step].append(get_pctl(fct, 0.5)) # mid fct
-			res[i/step].append(get_pctl(fct, 0.95)) # 95-pct fct
-			res[i/step].append(get_pctl(fct, 0.99)) # 99-pct fct
-	for item in res:
-		line = "%.3f %d"%(item[0], item[1])
-		i = 1
-		for cc in CCs:
-			line += "\t%.3f %.3f %.3f"%(item[i+1], item[i+2], item[i+3])
-			i += 4
-		print line
+	file_path = 'your_file_path.txt'  # 替换为实际的文件路径
+    results = process_file(file_path)
+    print("平均FCT:", results[0])
+    print("大流平均FCT:", results[1])
+    print("小流平均FCT:", results[2])
+    print("第99%大的FCT:", results[3])
+    print("第95%大的FCT:", results[4])
