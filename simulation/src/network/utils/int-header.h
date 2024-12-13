@@ -48,7 +48,7 @@ public:
                 lineRate=0;break;
 			case 25000000000lu:
 				lineRate=1;break;
-			case 50000000000lu:
+			case 40000000000lu:
 				lineRate=2;break;
 			case 100000000000lu:
 				lineRate=3;break;

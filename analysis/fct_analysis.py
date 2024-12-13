@@ -44,8 +44,9 @@ if __name__=="__main__":
     parser.add_option("-c", "--congestion_control", dest="congestion_control",
                       help="congestion_control parameter value", default="dcqcn")
 
-    args = parser.parse_args()
-    file_path = f"../simulation/mix/fct_spine_leaf_{args.traffic_mode}_{traffic_load}_0.1_{congestion_control}.txt"
+    options,args = parser.parse_args()
+
+    file_path = f"../simulation/mix/fct_spine_leaf_{options.traffic_mode}_{options.traffic_load}_0.1_{options.congestion_control}.txt"
     results = process_file(file_path)
     print("平均FCT: {:.2e}".format(np.float64(results[0])))
     print("大流平均FCT: {:.2e}".format(np.float64(results[1])))

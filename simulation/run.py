@@ -127,9 +127,9 @@ if __name__ == "__main__":
 		ai = 10 # ai is useless for dctcp
 		hai = ai  # also useless
 		dctcp_ai=615 # calculated from RTT=13us and MTU=1KB, because DCTCP add 1 MTU per RTT.
-		kmax_map = "2 %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10)
-		kmin_map = "2 %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10)
-		pmax_map = "2 %d %.2f %d %.2f"%(bw*1000000000, 1.0, bw*4*1000000000, 1.0)
+		kmax_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10, bw*10*1000000000, 30*bw*10/10)
+		kmin_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10, bw*10*1000000000, 30*bw*10/10)
+		pmax_map = "3 %d %.2f %d %.2f %d %.2f"%(bw*1000000000, 1.0, bw*4*1000000000, 1.0, bw*10*1000000000, 1.0)
 		config = config_template.format(trace=trace, topo=topo, cc=args.cc, mode=8, t_alpha=1, t_dec=4, t_inc=300, g=0.0625, ai=ai, hai=hai, dctcp_ai=dctcp_ai, has_win=1, vwin=1, us=0, u_tgt=u_tgt, mi=mi, int_multi=1, pint_log_base=pint_log_base, pint_prob=pint_prob, ack_prio=0, link_down=args.down, failure=failure, kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map, buffer_size=bfsz, enable_tr=enable_tr)
 	elif args.cc == "timely":
 		ai = 10 * bw / 10;
@@ -161,4 +161,4 @@ if __name__ == "__main__":
 	with open(config_name, "w") as file:
 		file.write(config)
 	
-	os.system("./waf --run 'scratch/third %s'"%(config_name))
+	os.system("sudo ./waf --run 'scratch/third %s'"%(config_name))
