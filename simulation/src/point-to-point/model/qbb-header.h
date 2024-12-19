@@ -41,6 +41,8 @@ public:
   void SetTs(uint64_t ts);
   void SetCnp();
   void SetIntHeader(const IntHeader &_ih);
+	void SetReTx(uint8_t reTx);
+	void SetAACK(uint32_t aack);
 
 //Getters
   /**
@@ -53,6 +55,8 @@ public:
   uint16_t GetDport() const;
   uint64_t GetTs() const;
   uint8_t GetCnp() const;
+	uint8_t GetReTx() const;
+	uint32_t GetAACK() const;
 
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
@@ -68,7 +72,8 @@ private:
   uint16_t m_pg;
   uint32_t m_seq; // the qbb sequence number.
   IntHeader ih;
-  
+	uint8_t ReTx;
+	uint32_t AACK;  
 };
 
 }; // namespace ns3

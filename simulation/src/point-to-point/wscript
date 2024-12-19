@@ -22,7 +22,14 @@ def build(bld):
 		'model/switch-node.cc',
 		'model/switch-mmu.cc',
 		'model/pint.cc',
-        'model/mems-node.cc',        
+        'model/mems-node.cc',
+        'helper/mp-qbb-helper.cc',
+        'model/mp-qbb-channel.cc',
+        'model/mp-qbb-remote-channel.cc',  
+        'model/mp-qbb-net-device.cc',    
+        'model/mp-rdma-driver.cc',  
+        'model/mp-rdma-queue-pair.cc',
+        'model/mp-rdma-hw.cc',       
         ]
 
     module_test = bld.create_ns3_module_test_library('point-to-point')
@@ -54,7 +61,14 @@ def build(bld):
 		'model/pint.h',
 		'helper/sim-setting.h',
         'model/mems-node.h',        
-        'model/mems-link-matrix.h',        
+        'model/mems-link-matrix.h',      
+        'helper/mp-qbb-helper.h',
+        'model/mp-qbb-channel.h',
+        'model/mp-qbb-remote-channel.h',  
+        'model/mp-qbb-net-device.h',    
+        'model/mp-rdma-driver.h',  
+        'model/mp-rdma-queue-pair.h',
+        'model/mp-rdma-hw.h',            
         ]
 
     if (bld.env['ENABLE_EXAMPLES']):

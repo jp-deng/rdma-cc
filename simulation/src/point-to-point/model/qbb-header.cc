@@ -50,6 +50,15 @@ namespace ns3 {
 	void qbbHeader::SetIntHeader(const IntHeader &_ih){
 		ih = _ih;
 	}
+	void qbbHeader::SetReTx(uint8_t reTx)
+	{
+		ReTx = reTx;
+	}
+
+	void qbbHeader::SetAACK(uint32_t aack)
+	{
+		AACK = aack;
+	}
 
 	uint16_t qbbHeader::GetPG() const
 	{
@@ -74,6 +83,15 @@ namespace ns3 {
 	}
 	uint8_t qbbHeader::GetCnp() const{
 		return (flags >> FLAG_CNP) & 1;
+	}
+	uint8_t qbbHeader::GetReTx() const
+	{
+		return ReTx;
+	}
+
+	uint32_t qbbHeader::GetAACK() const
+	{
+		return AACK;
 	}
 
 	TypeId
@@ -100,7 +118,7 @@ namespace ns3 {
 	}
 	uint32_t qbbHeader::GetBaseSize() {
 		qbbHeader tmp;
-		return sizeof(tmp.sport) + sizeof(tmp.dport) + sizeof(tmp.flags) + sizeof(tmp.m_pg) + sizeof(tmp.m_seq);
+		return sizeof(tmp.sport) + sizeof(tmp.dport) + sizeof(tmp.flags) + sizeof(tmp.m_pg) + sizeof(tmp.m_seq) + sizeof(ReTx) + sizeof(AACK);
 	}
 	void qbbHeader::Serialize(Buffer::Iterator start)  const
 	{
@@ -113,6 +131,8 @@ namespace ns3 {
 
 		// write IntHeader
 		ih.Serialize(i);
+		i.WriteU8(ReTx);
+		i.WriteU32(AACK);        
 	}
 
 	uint32_t qbbHeader::Deserialize(Buffer::Iterator start)
@@ -126,6 +146,8 @@ namespace ns3 {
 
 		// read IntHeader
 		ih.Deserialize(i);
+		ReTx = i.ReadU8();
+		AACK = i.ReadU32();        
 		return GetSerializedSize();
 	}
 }; // namespace ns3

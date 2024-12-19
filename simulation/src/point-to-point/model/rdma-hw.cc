@@ -252,7 +252,9 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		qp->tmly.m_curRate = m_bps;
 	}else if (m_cc_mode == 10){
 		qp->hpccPint.m_curRate = m_bps;
-	}
+	} else if(m_cc_mode == 6) {
+		qp->newcc.m_curRate = m_bps;
+    }
 
 	// Notify Nic
 	m_nic[nic_idx].dev->NewQp(qp);
@@ -311,10 +313,10 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 	rxQp->m_ecn_source.total++;
 	rxQp->m_milestone_rx = m_ack_interval;
 
-    if(m_cc_mode == 6) {
-        UpdateFairRate(rxQp);
-        UpdateRecvRate(rxQp, p->GetSize());
-    }
+    // if(m_cc_mode == 6) {
+    //     UpdateFairRate(rxQp);
+    //     UpdateRecvRate(rxQp, p->GetSize());
+    // }
 
 	int x = ReceiverCheckSeq(ch.udp.seq, rxQp, payload_size);
 	if (x == 1 || x == 2){ //generate ACK or NACK
@@ -387,6 +389,8 @@ int RdmaHw::ReceiveCnp(Ptr<Packet> p, CustomHeader &ch){
 			qp->tmly.m_curRate = dev->GetDataRate();
 		}else if (m_cc_mode == 10){
 			qp->hpccPint.m_curRate = dev->GetDataRate();
+		}else if (m_cc_mode == 6){
+			qp->newcc.m_curRate = dev->GetDataRate();
 		}
 	}
 	return 0;
@@ -437,6 +441,8 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 		HandleAckDctcp(qp, p, ch);
 	}else if (m_cc_mode == 10){
 		HandleAckHpPint(qp, p, ch);
+	}else if (m_cc_mode == 6){
+		// HandleAckNewcc(qp, p, ch);
 	}
 	// ACK may advance the on-the-fly window, allowing more packets to send
 	dev->TriggerTransmit();
@@ -1127,6 +1133,16 @@ void RdmaHw::UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader
 /**********************
  * newcc
  *********************/
+
+// void RdmaHw::HandleAckNewcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch){
+// 	uint32_t ack_seq = ch.ack.seq;
+// 	// update rate
+// 	if (ack_seq > qp->tmly.m_lastUpdateSeq){ // if full RTT feedback is ready, do full update
+// 		UpdateRateTimely(qp, p, ch, false);
+// 	}else{ // do fast react
+// 		FastReactTimely(qp, p, ch);
+// 	}
+// }
 
  void RdmaHw::UpdateFairRate(Ptr<RdmaRxQueuePair> rxQp) {
     rxQp->m_fairRate = DataRate(10000000000lu / m_rxQpMap.size());
