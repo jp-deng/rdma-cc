@@ -54,7 +54,10 @@ namespace ns3
 
     uint64_t MpRdmaQueuePair::GetBytesLeft()
     {
-        return m_size - snd_done * m_mtu;
+        if(m_size > snd_done * m_mtu)
+            return m_size - snd_done * m_mtu;
+        else
+            return 0;
     }
 
     void MpRdmaQueuePair::SetSize(uint64_t size)

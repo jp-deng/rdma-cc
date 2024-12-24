@@ -116,6 +116,7 @@ namespace ns3
         }
         else if (qp->m_mode == MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY)
         {
+            std::cout << "recovery \n\n\n" << std::endl;
             uint32_t payload_size = qp->snd_retx == qp->m_size / m_mtu ? qp->m_size % m_mtu : m_mtu;
             p = Create<Packet>(payload_size);
             // recovery mode
@@ -200,7 +201,7 @@ namespace ns3
         )
         {
             // duplicate packet, drop it
-            // printf("duplicate packet, drop it\n");
+            printf("duplicate packet, drop it\n");
             return 2;
         }
         if (ch.udp.seq > rxMpQp->max_rcv_seq)
@@ -247,6 +248,7 @@ namespace ns3
             // if sync fail set NACK
             head.SetProtocol(0xFD);
             seqh.SetSeq(rxMpQp->aack + 1);
+            std::cout << "nack-----------------\n\n\n" << std::endl;
         }
         head.SetTtl(64);
         head.SetPayloadSize(newp->GetSize());
@@ -290,6 +292,7 @@ namespace ns3
         // printf("ReceiveACK()\n");
         Ptr<MpRdmaQueuePair> qp = GetQp(ch.sip, ch.ack.sport, ch.udp.pg);
         if (qp == NULL){
+            // std::cout << Ipv4Address(ch.dip) << " ---> " << Ipv4Address(ch.sip) << "  psn: " << ch.ack.seq << std::endl;
             std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
             return 0;
         }        
@@ -308,7 +311,7 @@ namespace ns3
 
         if (ch.l3Prot == 0xFD)
         { // NACK
-            // printf("NACK ch.ack.seq: %u\n", ch.ack.seq);
+            printf("NACK ch.ack.seq: %u\n", ch.ack.seq);
             // qp->m_mode = MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY;
             // qp->snd_retx = ch.ack.seq;
             // qp->recovery = qp->snd_done;
@@ -323,14 +326,14 @@ namespace ns3
             else
             {
                 // Ghost ACK, return 1
-                // printf("Ghost ACK, return 1\n");
+                printf("Ghost ACK, return 1\n");
                 return 1;
             }
 
             if (ch.ack.seq <= qp->max_acked_seq - m_delta && ch.ack.ReTx == 0)
             {
                 // out of order ACK, drop it, prune branch
-                // printf("out of order ACK, drop it, prune branch\n");
+                printf("out of order ACK, drop it, prune branch\n");
                 return 2;
             }
             // printf("ch.ack.AACK = %u\n", ch.ack.AACK);
@@ -397,9 +400,9 @@ namespace ns3
         else
         {
 // other protocol packet
-#if PRINT_LOG
+// #if PRINT_LOG
             std::cout << "Receive other protocol packet" << std::endl;
-#endif
+// #endif
             return 1;
         }
         return 0;
@@ -465,7 +468,6 @@ namespace ns3
         auto it = m_mpQpMap.find(GetQpKey(dip, dport, pg));
         if (it != m_mpQpMap.end())
             return it->second;
-        std::cout << "----------------" << GetQpKey(dip, dport, pg) << std::endl;
         return NULL;
     }
 
@@ -594,7 +596,6 @@ namespace ns3
     {
         // remove qp from the m_qpMap
         uint64_t key = GetQpKey(qp->dip.Get(), qp->dport, qp->m_pg);
-        std::cout << key << std::endl;
         m_mpQpMap.erase(key);
     }
 
