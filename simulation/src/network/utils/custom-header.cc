@@ -171,10 +171,10 @@ namespace ns3
 				// SeqTsHeader
 				i.WriteHtonU32(udp.seq);
 				i.WriteHtonU16(udp.pg);
-				udp.ih.Serialize(i);
 				// RoCEv2DataHeader
 				i.WriteU8(udp.synchronise);
-				i.WriteU8(udp.ReTx);
+				i.WriteU8(udp.ReTx);                
+				udp.ih.Serialize(i);
 			}
 			else if (l3Prot == 0xFF)
 			{ // CNP
@@ -191,10 +191,10 @@ namespace ns3
 				i.WriteU16(ack.flags);
 				i.WriteU16(ack.pg);
 				i.WriteU32(ack.seq);
-				udp.ih.Serialize(i);
 				// RoCEv2AckHeader
 				i.WriteU8(ack.ReTx);
-				i.WriteU32(ack.AACK);
+				i.WriteU32(ack.AACK);                
+				ack.ih.Serialize(i);
 			}
 			else if (l3Prot == 0xFE)
 			{ // PFC
@@ -330,12 +330,13 @@ namespace ns3
 				// SeqTsHeader
 				udp.seq = i.ReadNtohU32();
 				udp.pg = i.ReadNtohU16();
-				if (getInt)
-					udp.ih.Deserialize(i);
 
 				// RoCEv2DataHeader
 				udp.synchronise = i.ReadU8();
 				udp.ReTx = i.ReadU8();
+
+				if (getInt)
+					udp.ih.Deserialize(i);
 
 				l4Size = GetUdpHeaderSize();
 			}
@@ -355,11 +356,12 @@ namespace ns3
 				ack.flags = i.ReadU16();
 				ack.pg = i.ReadU16();
 				ack.seq = i.ReadU32();
-				if (getInt)
-					ack.ih.Deserialize(i);
 				// RoCEv2AckHeader
 				ack.ReTx = i.ReadU8();
 				ack.AACK = i.ReadU32();
+                                
+				if (getInt)
+					ack.ih.Deserialize(i);
 				l4Size = GetAckSerializedSize();
 			}
 			else if (l3Prot == 0xFE)
@@ -381,13 +383,13 @@ namespace ns3
 
 	uint32_t CustomHeader::GetAckSerializedSize(void)
 	{
-		return sizeof(ack.sport) + sizeof(ack.dport) + sizeof(ack.flags) + sizeof(ack.pg) + sizeof(ack.seq) + IntHeader::GetStaticSize() +
-			   sizeof(ack.ReTx) + sizeof(ack.AACK);
+		return sizeof(ack.sport) + sizeof(ack.dport) + sizeof(ack.flags) + sizeof(ack.pg) + sizeof(ack.seq) +
+			   sizeof(ack.ReTx) + sizeof(ack.AACK) + IntHeader::GetStaticSize();
 	}
 
 	uint32_t CustomHeader::GetUdpHeaderSize(void)
 	{
-		return 8 + sizeof(udp.pg) + sizeof(udp.seq) + IntHeader::GetStaticSize() + sizeof(udp.synchronise) + sizeof(udp.ReTx);
+		return 8 + sizeof(udp.pg) + sizeof(udp.seq) + sizeof(udp.synchronise) + sizeof(udp.ReTx) + IntHeader::GetStaticSize();
 	}
 
 	uint32_t CustomHeader::GetStaticWholeHeaderSize(void)

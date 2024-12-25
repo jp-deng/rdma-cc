@@ -17,6 +17,7 @@ fi
 cd ..
 
 cd simulation
-param_cc=dctcp
-python run.py --trace ${param_cdf}_${param_load}_${param_time} --topo spine_leaf --cc ${param_cc}
+param_cc=timely
+param_mp=none
+python run.py --trace ${param_cdf}_${param_load}_${param_time} --topo spine_leaf --cc ${param_cc} --mp ${param_mp}
 cd ..

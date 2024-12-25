@@ -113,10 +113,10 @@ namespace ns3
         // SeqTsHeader
         uint16_t pg;
         uint32_t seq;
-        IntHeader ih;
         // RoCEv2Header
         uint8_t synchronise;
         uint8_t ReTx;
+        IntHeader ih;
       } udp;
       // CnHeader
       struct
@@ -134,10 +134,10 @@ namespace ns3
         uint16_t flags;
         uint16_t pg;
         uint32_t seq; // the qbb sequence number.
-        IntHeader ih;
         // RoCEv2AckHeader
         uint8_t ReTx;
-        uint32_t AACK;
+        uint32_t AACK;        
+        IntHeader ih;
       } ack;
       // PauseHeader
       struct

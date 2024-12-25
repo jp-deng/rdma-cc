@@ -128,11 +128,11 @@ namespace ns3 {
 		i.WriteU16(flags);
 		i.WriteU16(m_pg);
 		i.WriteU32(m_seq);
+		i.WriteU8(ReTx);
+		i.WriteU32(AACK);    
 
 		// write IntHeader
 		ih.Serialize(i);
-		i.WriteU8(ReTx);
-		i.WriteU32(AACK);        
 	}
 
 	uint32_t qbbHeader::Deserialize(Buffer::Iterator start)
@@ -143,11 +143,11 @@ namespace ns3 {
 		flags = i.ReadU16();
 		m_pg = i.ReadU16();
 		m_seq = i.ReadU32();
-
+		ReTx = i.ReadU8();
+		AACK = i.ReadU32();   
 		// read IntHeader
 		ih.Deserialize(i);
-		ReTx = i.ReadU8();
-		AACK = i.ReadU32();        
+     
 		return GetSerializedSize();
 	}
 }; // namespace ns3

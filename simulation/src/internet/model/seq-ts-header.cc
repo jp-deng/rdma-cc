@@ -123,12 +123,11 @@ namespace ns3
     Buffer::Iterator i = start;
     i.WriteHtonU32(m_seq);
     i.WriteHtonU16(m_pg);
+    i.WriteU8(m_synchronise);
+    i.WriteU8(m_ReTx);
 
     // write IntHeader
     ih.Serialize(i);
-
-    i.WriteU8(m_synchronise);
-    i.WriteU8(m_ReTx);
   }
   uint32_t
   SeqTsHeader::Deserialize(Buffer::Iterator start)
@@ -136,12 +135,12 @@ namespace ns3
     Buffer::Iterator i = start;
     m_seq = i.ReadNtohU32();
     m_pg = i.ReadNtohU16();
-
+    m_synchronise = i.ReadU8();
+    m_ReTx = i.ReadU8();
+    
     // read IntHeader
     ih.Deserialize(i);
 
-    m_synchronise = i.ReadU8();
-    m_ReTx = i.ReadU8();
     return GetSerializedSize();
   }
 

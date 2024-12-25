@@ -71,9 +71,9 @@ private:
   uint16_t flags;
   uint16_t m_pg;
   uint32_t m_seq; // the qbb sequence number.
-  IntHeader ih;
 	uint8_t ReTx;
 	uint32_t AACK;  
+  IntHeader ih;
 };
 
 }; // namespace ns3
