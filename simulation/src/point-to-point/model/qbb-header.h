@@ -43,6 +43,8 @@ public:
   void SetIntHeader(const IntHeader &_ih);
 	void SetReTx(uint8_t reTx);
 	void SetAACK(uint32_t aack);
+    void SetRecvRate(uint64_t _recvRate);
+    void SetFairRate(uint64_t _fairRate);
 
 //Getters
   /**
@@ -57,6 +59,8 @@ public:
   uint8_t GetCnp() const;
 	uint8_t GetReTx() const;
 	uint32_t GetAACK() const;
+    uint64_t GetRecvRate() const;
+    uint64_t GetFairRate() const;
 
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
@@ -73,6 +77,8 @@ private:
   uint32_t m_seq; // the qbb sequence number.
 	uint8_t ReTx;
 	uint32_t AACK;  
+    uint64_t recvRate;
+    uint64_t fairRate;
   IntHeader ih;
 };
 

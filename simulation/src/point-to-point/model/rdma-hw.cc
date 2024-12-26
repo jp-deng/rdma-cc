@@ -175,6 +175,31 @@ TypeId RdmaHw::GetTypeId (void)
 				UintegerValue(65536),
 				MakeUintegerAccessor(&RdmaHw::pint_smpl_thresh),
 				MakeUintegerChecker<uint32_t>())
+		.AddAttribute("NewccBeta",
+				"Beta of Newcc",
+				DoubleValue(0.875),
+				MakeDoubleAccessor(&RdmaHw::m_newcc_beta),
+				MakeDoubleChecker<double>())      
+		.AddAttribute("NewccGamaLow",
+				"Gama Low of Newcc",
+				DoubleValue(0.4),
+				MakeDoubleAccessor(&RdmaHw::m_newcc_gama_low),
+				MakeDoubleChecker<double>())                         
+		.AddAttribute("NewccGamaHigh",
+				"Gama High of Newcc",
+				DoubleValue(0.7),
+				MakeDoubleAccessor(&RdmaHw::m_newcc_gama_high),
+				MakeDoubleChecker<double>())                  
+		.AddAttribute("NewccTLow",
+				"TLow of Newcc (ns)",
+				UintegerValue(50000),
+				MakeUintegerAccessor(&RdmaHw::m_newcc_TLow),
+				MakeUintegerChecker<uint64_t>())
+		.AddAttribute("newccTHigh",
+				"THigh of Newcc (ns)",
+				UintegerValue(500000),
+				MakeUintegerAccessor(&RdmaHw::m_newcc_THigh),
+				MakeUintegerChecker<uint64_t>())                                   
 		;
 	return tid;
 }
@@ -254,6 +279,7 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		qp->hpccPint.m_curRate = m_bps;
 	} else if(m_cc_mode == 6) {
 		qp->newcc.m_curRate = m_bps;
+        qp->newcc.m_gama = m_newcc_gama_low;
     }
 
 	// Notify Nic
@@ -313,24 +339,26 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 	rxQp->m_ecn_source.total++;
 	rxQp->m_milestone_rx = m_ack_interval;
 
-    // if(m_cc_mode == 6) {
-    //     UpdateFairRate(rxQp);
-    //     UpdateRecvRate(rxQp, p->GetSize());
-    // }
+    if(m_cc_mode == 6) {
+        UpdateFairRate(rxQp);
+        UpdateRecvRate(rxQp, p->GetSize());
+    }
 
 	int x = ReceiverCheckSeq(ch.udp.seq, rxQp, payload_size);
 	if (x == 1 || x == 2){ //generate ACK or NACK
-		qbbHeader seqh;
-		seqh.SetSeq(rxQp->ReceiverNextExpectedSeq);
-		seqh.SetPG(ch.udp.pg);
-		seqh.SetSport(ch.udp.dport);
-		seqh.SetDport(ch.udp.sport);
-		seqh.SetIntHeader(ch.udp.ih);
+		qbbHeader qbbh;
+		qbbh.SetSeq(rxQp->ReceiverNextExpectedSeq);
+		qbbh.SetPG(ch.udp.pg);
+		qbbh.SetSport(ch.udp.dport);
+		qbbh.SetDport(ch.udp.sport);
+		qbbh.SetIntHeader(ch.udp.ih);
+        qbbh.SetRecvRate(rxQp->m_recvRate.GetBitRate());
+        qbbh.SetFairRate(rxQp->m_fairRate.GetBitRate());
 		if (ecnbits)
-			seqh.SetCnp();
+			qbbh.SetCnp();
 
-		Ptr<Packet> newp = Create<Packet>(std::max(60-14-20-(int)seqh.GetSerializedSize(), 0));
-		newp->AddHeader(seqh);
+		Ptr<Packet> newp = Create<Packet>(std::max(60-14-20-(int)qbbh.GetSerializedSize(), 0));
+		newp->AddHeader(qbbh);
 
 		Ipv4Header head;	// Prepare IPv4 header
 		head.SetDestination(Ipv4Address(ch.sip));
@@ -442,7 +470,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	}else if (m_cc_mode == 10){
 		HandleAckHpPint(qp, p, ch);
 	}else if (m_cc_mode == 6){
-		// HandleAckNewcc(qp, p, ch);
+		HandleAckNewcc(qp, p, ch);
 	}
 	// ACK may advance the on-the-fly window, allowing more packets to send
 	dev->TriggerTransmit();
@@ -1134,15 +1162,45 @@ void RdmaHw::UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader
  * newcc
  *********************/
 
-// void RdmaHw::HandleAckNewcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch){
-// 	uint32_t ack_seq = ch.ack.seq;
-// 	// update rate
-// 	if (ack_seq > qp->tmly.m_lastUpdateSeq){ // if full RTT feedback is ready, do full update
-// 		UpdateRateTimely(qp, p, ch, false);
-// 	}else{ // do fast react
-// 		FastReactTimely(qp, p, ch);
-// 	}
-// }
+void RdmaHw::HandleAckNewcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch){
+	if (ch.ack.seq <= qp->newcc.m_lastUpdateSeq)    return;
+
+	uint32_t next_seq = qp->snd_nxt;
+	uint64_t rtt = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+	if (qp->newcc.m_lastUpdateSeq != 0){ // not first RTT
+		int64_t rtt_diff = (int64_t)rtt - (int64_t)qp->newcc.lastRtt;
+		qp->newcc.gradient = (1 - m_newcc_beta) * qp->newcc.gradient + m_newcc_beta * rtt_diff;
+
+        uint64_t newRate;
+		if (rtt < m_newcc_TLow){
+            newRate = qp->newcc.m_gama * ch.ack.fairRate + (1 - qp->newcc.m_gama) * qp->newcc.m_curRate.GetBitRate();
+            qp->newcc.m_curRate = std::min(newRate, ch.ack.fairRate);
+            qp->newcc.m_gama = qp->newcc.m_gama * (1 - qp->newcc.m_gama) + qp->newcc.m_gama * m_newcc_gama_high;
+		}
+        else if (rtt > m_newcc_THigh){
+            newRate = (1 - m_newcc_gama_low) * ch.ack.recvRate;
+            qp->newcc.m_curRate = std::min(qp->newcc.m_curRate.GetBitRate(), newRate);
+            qp->newcc.m_gama = m_newcc_gama_low;
+		}
+        else if (qp->newcc.gradient <= 0){
+            newRate = qp->newcc.m_gama * ch.ack.fairRate + (1 - qp->newcc.m_gama) * qp->newcc.m_curRate.GetBitRate();
+            qp->newcc.m_curRate = std::min(newRate, ch.ack.fairRate);
+            qp->newcc.m_gama = qp->newcc.m_gama * (1 - qp->newcc.m_gama) + qp->newcc.m_gama * m_newcc_gama_low;
+		}
+        else{
+            newRate = ch.ack.recvRate;
+            qp->newcc.m_curRate = std::min(qp->newcc.m_curRate.GetBitRate(), newRate);
+            qp->newcc.m_gama = m_newcc_gama_low;
+		}
+        qp->m_rate = qp->newcc.m_curRate;
+        qp->newcc.gradient = rtt_diff;
+	}
+	if (next_seq > qp->newcc.m_lastUpdateSeq){
+		qp->newcc.m_lastUpdateSeq = next_seq;
+		qp->newcc.lastRtt = rtt;
+	}
+
+}
 
  void RdmaHw::UpdateFairRate(Ptr<RdmaRxQueuePair> rxQp) {
     rxQp->m_fairRate = DataRate(10000000000lu / m_rxQpMap.size());

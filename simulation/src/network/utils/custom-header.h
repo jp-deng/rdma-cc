@@ -136,7 +136,9 @@ namespace ns3
         uint32_t seq; // the qbb sequence number.
         // RoCEv2AckHeader
         uint8_t ReTx;
-        uint32_t AACK;        
+        uint32_t AACK;
+        uint64_t recvRate;
+        uint64_t fairRate;                
         IntHeader ih;
       } ack;
       // PauseHeader

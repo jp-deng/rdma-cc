@@ -81,6 +81,10 @@ public:
 	}hpccPint;
 	struct{
 		DataRate m_curRate;
+        uint32_t m_lastUpdateSeq;        
+		uint64_t lastRtt;
+		double gradient;    
+        double m_gama;    
 	} newcc;    
 
 	/***********

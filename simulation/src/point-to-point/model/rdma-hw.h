@@ -154,8 +154,11 @@ public:
 	/*********************
 	 * newcc
 	 ********************/
+    double m_newcc_beta, m_newcc_gama_high, m_newcc_gama_low;
+	uint64_t m_newcc_TLow, m_newcc_THigh;
     void UpdateFairRate(Ptr<RdmaRxQueuePair> rxQp);   
     void UpdateRecvRate(Ptr<RdmaRxQueuePair> rxQp, int size);
+    void HandleAckNewcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);    
 };
 
 } /* namespace ns3 */

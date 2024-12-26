@@ -60,6 +60,13 @@ namespace ns3 {
 		AACK = aack;
 	}
 
+    void qbbHeader::SetRecvRate(uint64_t _recvRate) {
+        recvRate = _recvRate;
+    }
+    void qbbHeader::SetFairRate(uint64_t _fairRate) {
+        fairRate = _fairRate;
+    }
+
 	uint16_t qbbHeader::GetPG() const
 	{
 		return m_pg;
@@ -94,6 +101,13 @@ namespace ns3 {
 		return AACK;
 	}
 
+    uint64_t qbbHeader::GetRecvRate() const {
+        return recvRate;
+    }
+    uint64_t qbbHeader::GetFairRate() const {
+        return fairRate;
+    }
+
 	TypeId
 		qbbHeader::GetTypeId(void)
 	{
@@ -118,7 +132,7 @@ namespace ns3 {
 	}
 	uint32_t qbbHeader::GetBaseSize() {
 		qbbHeader tmp;
-		return sizeof(tmp.sport) + sizeof(tmp.dport) + sizeof(tmp.flags) + sizeof(tmp.m_pg) + sizeof(tmp.m_seq) + sizeof(ReTx) + sizeof(AACK);
+		return sizeof(tmp.sport) + sizeof(tmp.dport) + sizeof(tmp.flags) + sizeof(tmp.m_pg) + sizeof(tmp.m_seq) + sizeof(ReTx) + sizeof(AACK) + sizeof(recvRate) + sizeof(fairRate);
 	}
 	void qbbHeader::Serialize(Buffer::Iterator start)  const
 	{
@@ -130,7 +144,8 @@ namespace ns3 {
 		i.WriteU32(m_seq);
 		i.WriteU8(ReTx);
 		i.WriteU32(AACK);    
-
+        i.WriteU64(recvRate);
+        i.WriteU64(fairRate);
 		// write IntHeader
 		ih.Serialize(i);
 	}
@@ -144,7 +159,9 @@ namespace ns3 {
 		m_pg = i.ReadU16();
 		m_seq = i.ReadU32();
 		ReTx = i.ReadU8();
-		AACK = i.ReadU32();   
+		AACK = i.ReadU32();  
+        recvRate = i.ReadU64();
+        fairRate = i.ReadU64(); 
 		// read IntHeader
 		ih.Deserialize(i);
      
