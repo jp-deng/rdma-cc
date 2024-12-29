@@ -1,4 +1,4 @@
-import numpy as np
+# -*- coding: utf - 8 -*-
 from optparse import OptionParser
 
 def process_file(file_path):
@@ -42,14 +42,13 @@ if __name__=="__main__":
     parser.add_option("-l", "--traffic_load", dest="traffic_load",
                       help="Value for the traffic_load parameter", default="0.3")
     parser.add_option("-c", "--congestion_control", dest="congestion_control",
-                      help="congestion_control parameter value", default="dcqcn")
+                      help="congestion_control parameter value", default="newcc")
 
     options,args = parser.parse_args()
-
-    file_path = f"../simulation/mix/fct_spine_leaf_{options.traffic_mode}_{options.traffic_load}_0.1_{options.congestion_control}.txt"
+    file_path = "../simulation/mix/fct_spine_leaf_{}_{}_0.1_{}.txt".format(options.traffic_mode, options.traffic_load, options.congestion_control)
     results = process_file(file_path)
-    print("平均FCT: {:.2e}".format(np.float64(results[0])))
-    print("大流平均FCT: {:.2e}".format(np.float64(results[1])))
-    print("小流平均FCT: {:.2e}".format(np.float64(results[2])))
-    print("第99%大的FCT: {:.2e}".format(np.float64(results[3])))
-    print("第95%大的FCT: {:.2e}".format(np.float64(results[4])))
+    print("平均FCT: {:.3e}".format(float(results[0])))
+    print("大流平均FCT: {:.3e}".format(float(results[1])))
+    print("小流平均FCT: {:.3e}".format(float(results[2])))
+    print("第99%大的FCT: {:.3e}".format(float(results[3])))
+    print("第95%大的FCT: {:.3e}".format(float(results[4])))

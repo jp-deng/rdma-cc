@@ -231,15 +231,16 @@ std::ofstream rate_log("rate_log2.txt");
 #define IPV4CONVERT(id) Ipv4Address(0x0b000001 + ((id / 256) * 0x00010000) + ((id % 256) * 0x00000100))
 
 void monitor_rate() {
-    Ptr<Node> h = Hosts[3];
-    Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
-    for(int i = 0; i < qpg->GetN(); i++) {
-        Ptr<RdmaQueuePair> q = qpg->Get(i);
-        if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
-            rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
-        }        
-    }
-    Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
+    // Ptr<Node> h = Hosts[0];
+    // Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    // std::cout << qpg->GetN() << std::endl;
+    // for(int i = 0; i < qpg->GetN(); i++) {
+    //     Ptr<RdmaQueuePair> q = qpg->Get(i);
+    //     if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
+    //         rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+    //     }        
+    // }
+    // Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
 }
 
 void PrintProgress(Time interval) {
@@ -711,7 +712,7 @@ int main(int argc, char *argv[])
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7) // timely, use ts
+	if (cc_mode == 7 || cc_mode == 6) // timely and newcc, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, use int
 		IntHeader::mode = IntHeader::NORMAL;

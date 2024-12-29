@@ -66,7 +66,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='run simulation')
 	parser.add_argument('--cc', dest='cc', action='store', default='dcqcn', help="congestion control")
 	parser.add_argument('--mp', dest='mp', action='store', default='none', help="multi path")
-	parser.add_argument('--trace', dest='trace', action='store', default='WebSearch_0.3', help="the name of the flow file")
+	parser.add_argument('--trace', dest='trace', action='store', default='ManyToOne', help="the name of the flow file")
 	parser.add_argument('--bw', dest="bw", action='store', default='10', help="the NIC bandwidth")
 	parser.add_argument('--down', dest='down', action='store', default='0 0 0', help="link down event")
 	parser.add_argument('--topo', dest='topo', action='store', default='spine_leaf', help="the name of the topology file")
