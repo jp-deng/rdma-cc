@@ -43,6 +43,8 @@ public:
   void SetIntHeader(const IntHeader &_ih);
 	void SetReTx(uint8_t reTx);
 	void SetAACK(uint32_t aack);
+    void SetPathId(uint8_t _pathId);
+    void SetPathSeq(uint32_t _pathSeq);
     void SetRecvRate(uint64_t _recvRate);
     void SetFairRate(uint64_t _fairRate);
 
@@ -59,6 +61,8 @@ public:
   uint8_t GetCnp() const;
 	uint8_t GetReTx() const;
 	uint32_t GetAACK() const;
+    uint8_t GetPathId() const;
+    uint32_t GetPathSeq() const;
     uint64_t GetRecvRate() const;
     uint64_t GetFairRate() const;
 
@@ -77,6 +81,8 @@ private:
   uint32_t m_seq; // the qbb sequence number.
 	uint8_t ReTx;
 	uint32_t AACK;  
+    uint8_t pathId;
+    uint32_t pathSeq;
     uint64_t recvRate;
     uint64_t fairRate;
   IntHeader ih;

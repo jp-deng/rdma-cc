@@ -87,6 +87,19 @@ namespace ns3
     return m_ReTx;
   }
 
+    void SeqTsHeader::SetPathId(uint8_t _pathId) {
+        pathId = _pathId;
+    }
+    void SeqTsHeader::SetPathSeq(uint32_t _pathSeq) {
+        pathSeq = _pathSeq;
+    }
+    uint8_t SeqTsHeader::GetPathId() const {
+        return pathId;
+    }
+    uint32_t SeqTsHeader::GetPathSeq() const {
+        return pathSeq;
+    }
+
   TypeId
   SeqTsHeader::GetTypeId(void)
   {
@@ -114,7 +127,7 @@ namespace ns3
   }
   uint32_t SeqTsHeader::GetHeaderSize(void)
   {
-    return 6 + 2 + IntHeader::GetStaticSize();
+    return 6 + 2 + 5 + IntHeader::GetStaticSize();
   }
 
   void
@@ -125,6 +138,8 @@ namespace ns3
     i.WriteHtonU16(m_pg);
     i.WriteU8(m_synchronise);
     i.WriteU8(m_ReTx);
+        i.WriteU8(pathId);
+        i.WriteU32(pathSeq);
 
     // write IntHeader
     ih.Serialize(i);
@@ -137,7 +152,8 @@ namespace ns3
     m_pg = i.ReadNtohU16();
     m_synchronise = i.ReadU8();
     m_ReTx = i.ReadU8();
-    
+        pathId = i.ReadU8();
+        pathSeq = i.ReadU32();
     // read IntHeader
     ih.Deserialize(i);
 

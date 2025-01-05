@@ -67,6 +67,11 @@ namespace ns3
     void SetReTx(uint8_t reTx);
     uint8_t GetReTx(void) const;
 
+    void SetPathId(uint8_t _pathId);
+    void SetPathSeq(uint32_t _pathSeq);
+    uint8_t GetPathId() const;
+    uint32_t GetPathSeq() const;
+
     static TypeId GetTypeId(void);
     virtual TypeId GetInstanceTypeId(void) const;
     virtual void Print(std::ostream &os) const;
@@ -81,7 +86,8 @@ namespace ns3
     uint16_t m_pg;
     uint8_t m_synchronise;
     uint8_t m_ReTx;
-
+    uint8_t pathId;
+    uint32_t pathSeq;
   public:
     IntHeader ih;
   };

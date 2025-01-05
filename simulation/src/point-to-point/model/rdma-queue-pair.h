@@ -12,6 +12,12 @@
 
 namespace ns3 {
 
+// class VirtualPath: public Object {
+// public:
+//     uint8_t pathId;
+//     uint64_t pathRtt;
+// };
+
 class RdmaQueuePair : public Object {
 public:
 	Time startTime;
@@ -106,6 +112,10 @@ public:
 	uint64_t GetWin(); // window size calculated from m_rate
 	bool IsFinished();
 	uint64_t HpGetCurWin(); // window size calculated from hp.m_curRate, used by HPCC
+
+    /*multi path*/
+    // uint8_t m_curPathId;
+    // uint8_t GetNxtPathId();
 };
 
 class RdmaRxQueuePair : public Object { // Rx side queue pair

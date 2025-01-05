@@ -35,6 +35,11 @@ TypeId RdmaHw::GetTypeId (void)
 				UintegerValue(0),
 				MakeUintegerAccessor(&RdmaHw::m_cc_mode),
 				MakeUintegerChecker<uint32_t>())
+		.AddAttribute ("MpMode",
+				"Multi Path Mode",
+				UintegerValue(0),
+				MakeUintegerAccessor(&RdmaHw::m_mp_mode),
+				MakeUintegerChecker<uint32_t>())                
 		.AddAttribute("NACK Generation Interval",
 				"The NACK Generation interval",
 				DoubleValue(500.0),
@@ -429,6 +434,9 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	uint16_t port = ch.ack.dport;
 	uint32_t seq = ch.ack.seq;
 	uint8_t cnp = (ch.ack.flags >> qbbHeader::FLAG_CNP) & 1;
+    uint8_t pathId = ch.ack.pathId;
+    uint32_t pathSeq = ch.ack.pathSeq;
+    
 	int i;
 	Ptr<RdmaQueuePair> qp = GetQp(ch.sip, port, qIndex);
 	if (qp == NULL){

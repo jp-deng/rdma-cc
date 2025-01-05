@@ -116,6 +116,8 @@ namespace ns3
         // RoCEv2Header
         uint8_t synchronise;
         uint8_t ReTx;
+        uint8_t pathId;
+        uint32_t pathSeq;        
         IntHeader ih;
       } udp;
       // CnHeader
@@ -137,6 +139,8 @@ namespace ns3
         // RoCEv2AckHeader
         uint8_t ReTx;
         uint32_t AACK;
+        uint8_t pathId;
+        uint32_t pathSeq;           
         uint64_t recvRate;
         uint64_t fairRate;                
         IntHeader ih;

@@ -17,7 +17,8 @@ class SwitchNode : public Node{
 	static const uint32_t qCnt = 8;	// Number of queues/priorities used
 	uint32_t m_ecmpSeed;
 	std::unordered_map<uint32_t, std::vector<int> > m_rtTable; // map from ip address (u32) to possible ECMP port (index of dev)
-	std::unordered_map<uint32_t, std::vector<int> > m_rtOpticalTable; // map from ip address (u32) to possible ECMP port (index of dev)
+	std::unordered_map<uint32_t, uint32_t> m_rtOpticalTable; // map from ip address (u32) to possible ECMP port (index of dev)
+	std::unordered_map<uint32_t, uint32_t> m_rtMpOpticalTable; // map from ip address (u32) to possible ECMP port (index of dev)
 
 	// monitor of PFC	
 	uint64_t m_txBytes[pCnt]; // counter of tx bytes
@@ -49,7 +50,9 @@ public:
 	void AddTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
 	void ClearTable();
 	void AddOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
-	void ClearOpticalTable();
+	void ClearOpticalTableEntry(Ipv4Address &dstAddr);
+	void AddMpOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
+	void ClearMpOpticalTableEntry(Ipv4Address &dstAddr);
 
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);

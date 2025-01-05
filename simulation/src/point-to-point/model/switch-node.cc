@@ -57,8 +57,8 @@ SwitchNode::SwitchNode(){
 
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch){
     if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
-        return m_rtOpticalTable[ch.dip][0];
-    }        
+        return m_rtOpticalTable[ch.dip];
+    }
     else {    
         // look up entries
         auto entry = m_rtTable.find(ch.dip);
@@ -189,11 +189,22 @@ void SwitchNode::ClearTable(){
 
 void SwitchNode::AddOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx){
 	uint32_t dip = dstAddr.Get();
-	m_rtOpticalTable[dip].push_back(intf_idx);
+	m_rtOpticalTable[dip] = intf_idx;
 }
 
-void SwitchNode::ClearOpticalTable(){
-	m_rtOpticalTable.clear();
+void SwitchNode::ClearOpticalTableEntry(Ipv4Address &dstAddr){
+	uint32_t dip = dstAddr.Get();
+	m_rtOpticalTable.erase(dip);
+}
+
+void SwitchNode::AddMpOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx){
+	uint32_t dip = dstAddr.Get();
+	m_rtMpOpticalTable[dip] = intf_idx;
+}
+
+void SwitchNode::ClearMpOpticalTableEntry(Ipv4Address &dstAddr){
+	uint32_t dip = dstAddr.Get();
+	m_rtMpOpticalTable.erase(dip);
 }
 
 // This function can only be called in switch mode
@@ -227,7 +238,7 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 	if (1){
 		uint8_t* buf = p->GetBuffer();
 		if (buf[PppHeader::GetStaticSize() + 9] == 0x11){ // udp packet
-            IntHeader *ih = (IntHeader *)&buf[PppHeader::GetStaticSize() + 20 + 8 + 6 + 2]; // ppp, ip, udp, SeqTs, INT, RoCEv2Data
+            IntHeader *ih = (IntHeader *)&buf[PppHeader::GetStaticSize() + 20 + 8 + 6 + 2 + 5]; // ppp, ip, udp, SeqTs, INT, RoCEv2Data, mprdma
 			Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
 			if (m_ccMode == 3){ // HPCC
 				ih->PushHop(Simulator::Now().GetTimeStep(), m_txBytes[ifIndex], dev->GetQueue()->GetNBytesTotal(), dev->GetDataRate().GetBitRate());
