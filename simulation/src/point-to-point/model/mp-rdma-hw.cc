@@ -116,7 +116,7 @@ namespace ns3
         }
         else if (qp->m_mode == MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY)
         {
-            std::cout << "recovery \n\n\n" << std::endl;
+            // std::cout << "recovery \n\n\n" << std::endl;
             uint32_t payload_size = qp->snd_retx == qp->m_size / m_mtu ? qp->m_size % m_mtu : m_mtu;
             p = Create<Packet>(payload_size);
             // recovery mode
@@ -201,7 +201,7 @@ namespace ns3
         )
         {
             // duplicate packet, drop it
-            printf("duplicate packet, drop it\n");
+            // printf("duplicate packet, drop it\n");
             return 2;
         }
         if (ch.udp.seq > rxMpQp->max_rcv_seq)
@@ -248,7 +248,6 @@ namespace ns3
             // if sync fail set NACK
             head.SetProtocol(0xFD);
             seqh.SetSeq(rxMpQp->aack + 1);
-            std::cout << "nack-----------------\n\n\n" << std::endl;
         }
         head.SetTtl(64);
         head.SetPayloadSize(newp->GetSize());
@@ -326,7 +325,7 @@ namespace ns3
             else
             {
                 // Ghost ACK, return 1
-                printf("Ghost ACK, return 1\n");
+                // printf("Ghost ACK, return 1\n");
                 return 1;
             }
 

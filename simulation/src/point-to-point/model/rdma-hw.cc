@@ -12,6 +12,8 @@
 #include "ppp-header.h"
 #include "qbb-header.h"
 #include "cn-header.h"
+#include "ns3/path-id-tag.h"
+#include "ns3/path-rtt-tag.h"
 #include <fstream>
 
 namespace ns3{
@@ -259,6 +261,7 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 	qp->SetBaseRtt(baseRtt);
 	qp->SetVarWin(m_var_win);
 	qp->SetAppNotifyCallback(notifyAppFinish);
+    if(m_mp_mode)   qp->isMulti = true;
 
 	// add qp
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
@@ -349,7 +352,14 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
         UpdateRecvRate(rxQp, p->GetSize());
     }
 
-	int x = ReceiverCheckSeq(ch.udp.seq, rxQp, payload_size);
+	int x = 0;
+    PathIdTag t;
+    p->PeekPacketTag(t);
+    if(m_mp_mode)
+        x = ReceiverCheckSeq(t.GetPathId(), ch.udp.pathSeq, rxQp, payload_size);
+    else
+        x = ReceiverCheckSeq(ch.udp.seq, rxQp, payload_size);
+
 	if (x == 1 || x == 2){ //generate ACK or NACK
 		qbbHeader qbbh;
 		qbbh.SetSeq(rxQp->ReceiverNextExpectedSeq);
@@ -362,9 +372,17 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 		if (ecnbits)
 			qbbh.SetCnp();
 
+        if(m_mp_mode) {
+            qbbh.SetPathSeq(rxQp->path_ReceiverNextExpectedSeq[t.GetPathId()]);
+        }
+
 		Ptr<Packet> newp = Create<Packet>(std::max(60-14-20-(int)qbbh.GetSerializedSize(), 0));
 		newp->AddHeader(qbbh);
-
+        newp->AddPacketTag(t);          
+        if(m_mp_mode) {  
+            PathRttTag rt(Simulator::Now().GetTimeStep());
+            newp->AddPacketTag(rt);            
+        }
 		Ipv4Header head;	// Prepare IPv4 header
 		head.SetDestination(Ipv4Address(ch.sip));
 		head.SetSource(Ipv4Address(ch.dip));
@@ -434,15 +452,23 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	uint16_t port = ch.ack.dport;
 	uint32_t seq = ch.ack.seq;
 	uint8_t cnp = (ch.ack.flags >> qbbHeader::FLAG_CNP) & 1;
-    uint8_t pathId = ch.ack.pathId;
-    uint32_t pathSeq = ch.ack.pathSeq;
-    
+
 	int i;
 	Ptr<RdmaQueuePair> qp = GetQp(ch.sip, port, qIndex);
 	if (qp == NULL){
-		std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
+		// std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
 		return 0;
 	}
+
+    uint32_t pathId = 10;
+    if(m_mp_mode) {
+        PathRttTag rt;
+        p->PeekPacketTag(rt);
+        PathIdTag t;
+        p->PeekPacketTag(t);
+        pathId = t.GetPathId();
+        qp->path_rtt[pathId] = Simulator::Now().GetTimeStep() - rt.GetPathRtt();
+    }
 
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
@@ -450,7 +476,8 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 		std::cout << "ERROR: shouldn't receive ack\n";
 	else {
 		if (!m_backto0){
-			qp->Acknowledge(seq);
+            if(m_mp_mode)   qp->Acknowledge(pathId, ch.ack.pathSeq);
+			else    qp->Acknowledge(seq);
 		}else {
 			uint32_t goback_seq = seq / m_chunk * m_chunk;
 			qp->Acknowledge(goback_seq);
@@ -459,9 +486,11 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 			QpComplete(qp);
 		}
 	}
-	if (ch.l3Prot == 0xFD) // NACK
-		RecoverQueue(qp);
-
+	if (ch.l3Prot == 0xFD)  {
+        // NACK 
+        if(m_mp_mode)   RecoverQueue(pathId, qp);
+		else    RecoverQueue(qp);
+    }
 	// handle cnp
 	if (cnp){
 		if (m_cc_mode == 1){ // mlx version
@@ -526,11 +555,33 @@ int RdmaHw::ReceiverCheckSeq(uint32_t seq, Ptr<RdmaRxQueuePair> q, uint32_t size
 		return 3;
 	}
 }
+
+int RdmaHw::ReceiverCheckSeq(uint32_t pathId, uint32_t pathSeq, Ptr<RdmaRxQueuePair> q, uint32_t size) {
+    uint32_t expected = q->path_ReceiverNextExpectedSeq[pathId];
+    if (pathSeq == expected){
+        //Generate ACK
+        q->path_ReceiverNextExpectedSeq[pathId] = expected + size;
+        return 1;
+    } else if (pathSeq > expected) {
+        // Generate NACK
+        if (Simulator::Now() >= q->path_nackTimer[pathId] || q->path_lastNACK[pathId] != expected){
+            q->path_nackTimer[pathId] = Simulator::Now() + MicroSeconds(m_nack_interval);
+            q->path_lastNACK[pathId] = expected;
+            return 2;
+        }else
+            return 4;
+    } else {
+        // Duplicate. 
+        return 3;
+    }
+}
+
 void RdmaHw::AddHeader (Ptr<Packet> p, uint16_t protocolNumber){
 	PppHeader ppp;
 	ppp.SetProtocol (EtherToPpp (protocolNumber));
 	p->AddHeader (ppp);
 }
+
 uint16_t RdmaHw::EtherToPpp (uint16_t proto){
 	switch(proto){
 		case 0x0800: return 0x0021;   //IPv4
@@ -542,6 +593,10 @@ uint16_t RdmaHw::EtherToPpp (uint16_t proto){
 
 void RdmaHw::RecoverQueue(Ptr<RdmaQueuePair> qp){
 	qp->snd_nxt = qp->snd_una;
+}
+
+void RdmaHw::RecoverQueue(uint32_t pathId, Ptr<RdmaQueuePair> qp){
+	qp->path_snd_nxt[pathId] = qp->path_snd_una[pathId];
 }
 
 void RdmaHw::QpComplete(Ptr<RdmaQueuePair> qp){
@@ -598,10 +653,20 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
 	if (m_mtu < payload_size)
 		payload_size = m_mtu;
 	Ptr<Packet> p = Create<Packet> (payload_size);
+
 	// add SeqTsHeader
 	SeqTsHeader seqTs;
 	seqTs.SetSeq (qp->snd_nxt);
 	seqTs.SetPG (qp->m_pg);
+    
+    uint32_t pathId = 10;    
+    if(m_mp_mode) {      
+        pathId = qp->GetNxtPathId();
+        seqTs.SetPathSeq(qp->path_snd_nxt[pathId]);
+        qp->path_snd_nxt[pathId] += payload_size;
+    }
+    p->AddPacketTag (PathIdTag (pathId)); 
+
 	p->AddHeader (seqTs);
 	// add udp header
 	UdpHeader udpHeader;

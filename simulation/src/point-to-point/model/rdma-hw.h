@@ -66,10 +66,12 @@ public:
 
 	void CheckandSendQCN(Ptr<RdmaRxQueuePair> q);
 	int ReceiverCheckSeq(uint32_t seq, Ptr<RdmaRxQueuePair> q, uint32_t size);
+	int ReceiverCheckSeq(uint32_t pathId, uint32_t pathSeq, Ptr<RdmaRxQueuePair> q, uint32_t size);
 	void AddHeader (Ptr<Packet> p, uint16_t protocolNumber);
 	static uint16_t EtherToPpp (uint16_t protocol);
 
 	void RecoverQueue(Ptr<RdmaQueuePair> qp);
+	void RecoverQueue(uint32_t pathId, Ptr<RdmaQueuePair> qp);
 	void QpComplete(Ptr<RdmaQueuePair> qp);
 	void SetLinkDown(Ptr<QbbNetDevice> dev);
 

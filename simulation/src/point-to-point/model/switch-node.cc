@@ -10,6 +10,7 @@
 #include "qbb-net-device.h"
 #include "ppp-header.h"
 #include "ns3/int-header.h"
+#include "ns3/path-id-tag.h"
 #include <cmath>
 
 namespace ns3 {
@@ -55,37 +56,57 @@ SwitchNode::SwitchNode(){
 		m_u[i] = 0;
 }
 
+int SwitchNode::GetElecOutDev(CustomHeader &ch) {
+     // look up entries
+    auto entry = m_rtTable.find(ch.dip);
+
+    // no matching entry
+    if (entry == m_rtTable.end())
+        return -1;
+
+    // entry found
+    auto &nexthops = entry->second;
+
+    // pick one next hop based on hash
+    union {
+        uint8_t u8[4+4+2+2];
+        uint32_t u32[3];
+    } buf;
+    buf.u32[0] = ch.sip;
+    buf.u32[1] = ch.dip;
+    if (ch.l3Prot == 0x6)
+        buf.u32[2] = ch.tcp.sport | ((uint32_t)ch.tcp.dport << 16);
+    else if (ch.l3Prot == 0x11)
+        buf.u32[2] = ch.udp.sport | ((uint32_t)ch.udp.dport << 16);
+    else if (ch.l3Prot == 0xFC || ch.l3Prot == 0xFD)
+        buf.u32[2] = ch.ack.sport | ((uint32_t)ch.ack.dport << 16);
+
+    uint32_t idx = EcmpHash(buf.u8, 12, m_ecmpSeed) % nexthops.size();
+    // std::cout << nexthops[idx] << std::endl;
+    return nexthops[idx];
+}
+
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch){
-    if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
-        return m_rtOpticalTable[ch.dip];
+    PathIdTag t;
+	p->PeekPacketTag(t);
+    if (t.GetPathId() == 0) {
+        if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
+            return m_rtOpticalTable[ch.dip];
+        } else if (m_rtMpOpticalTable.find(ch.dip) != m_rtMpOpticalTable.end()){
+            return m_rtMpOpticalTable[ch.dip];
+        } else {
+            return GetElecOutDev(ch);   
+        }
+    } else if (t.GetPathId() == 1) {
+        return GetElecOutDev(ch);       
     }
-    else {    
-        // look up entries
-        auto entry = m_rtTable.find(ch.dip);
-
-        // no matching entry
-        if (entry == m_rtTable.end())
-            return -1;
-
-        // entry found
-        auto &nexthops = entry->second;
-
-        // pick one next hop based on hash
-        union {
-            uint8_t u8[4+4+2+2];
-            uint32_t u32[3];
-        } buf;
-        buf.u32[0] = ch.sip;
-        buf.u32[1] = ch.dip;
-        if (ch.l3Prot == 0x6)
-            buf.u32[2] = ch.tcp.sport | ((uint32_t)ch.tcp.dport << 16);
-        else if (ch.l3Prot == 0x11)
-            buf.u32[2] = ch.udp.sport | ((uint32_t)ch.udp.dport << 16);
-        else if (ch.l3Prot == 0xFC || ch.l3Prot == 0xFD)
-            buf.u32[2] = ch.ack.sport | ((uint32_t)ch.ack.dport << 16);
-
-        uint32_t idx = EcmpHash(buf.u8, 12, m_ecmpSeed) % nexthops.size();
-        return nexthops[idx];
+    else {
+        if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
+            return m_rtOpticalTable[ch.dip];
+        }
+        else {    
+           return GetElecOutDev(ch);     
+        }
     }
 }
 
@@ -112,7 +133,7 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 
 		// determine the qIndex
 		uint32_t qIndex;
-		if (ch.l3Prot == 0xFF || ch.l3Prot == 0xFE || (m_ackHighPrio && (ch.l3Prot == 0xFD || ch.l3Prot == 0xFC))){  //QCN or PFC or NACK, go highest priority
+		if (ch.l3Prot == 0xFF || ch.l3Prot == 0xFE || (m_ackHighPrio && (ch.l3Prot == 0xFD || ch.l3Prot == 0xFC)) || idx <= 8){  //QCN or PFC or NACK, go highest priority
 			qIndex = 0;
 		}else{
 			qIndex = (ch.l3Prot == 0x06 ? 1 : ch.udp.pg); // if TCP, put to queue 1

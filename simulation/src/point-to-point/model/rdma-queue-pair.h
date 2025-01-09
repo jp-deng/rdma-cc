@@ -12,12 +12,6 @@
 
 namespace ns3 {
 
-// class VirtualPath: public Object {
-// public:
-//     uint8_t pathId;
-//     uint64_t pathRtt;
-// };
-
 class RdmaQueuePair : public Object {
 public:
 	Time startTime;
@@ -114,8 +108,12 @@ public:
 	uint64_t HpGetCurWin(); // window size calculated from hp.m_curRate, used by HPCC
 
     /*multi path*/
-    // uint8_t m_curPathId;
-    // uint8_t GetNxtPathId();
+    bool isMulti;
+    uint64_t path_rtt[2];
+    uint64_t path_snd_nxt[2], path_snd_una[2];
+    uint8_t m_curPathId;
+    uint8_t GetNxtPathId();
+    void Acknowledge(uint32_t pathId, uint64_t ack);    
 };
 
 class RdmaRxQueuePair : public Object { // Rx side queue pair
@@ -138,14 +136,17 @@ public:
 	uint32_t m_lastNACK;
 	EventId QcnTimerEvent; // if destroy this rxQp, remember to cancel this timer
 
-    /***********
-	 * newcc
-	 **********/
+    /*newcc*/
     DataRate m_recvRate;
     DataRate m_fairRate;
     Time m_lastRecvTime;
     bool m_isFirstPkt;
     double m_alpha;    
+
+    /*multi path*/
+	uint32_t path_ReceiverNextExpectedSeq[2];
+    uint32_t path_lastNACK[2];
+    Time path_nackTimer[2];
 
 	static TypeId GetTypeId (void);
 	RdmaRxQueuePair();

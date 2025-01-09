@@ -71,6 +71,12 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     newcc.lastRtt = 0;
     newcc.gradient = 0;
     newcc.m_gama = 0;
+
+    path_rtt[0] = path_rtt[1] = m_baseRtt;
+    path_snd_nxt[0] = path_snd_nxt[1] = 0;
+    path_snd_una[0] = path_snd_una[1] = 0;
+    m_curPathId = 1;
+    isMulti = false;
 }
 
 void RdmaQueuePair::SetSize(uint64_t size){
@@ -94,7 +100,11 @@ void RdmaQueuePair::SetAppNotifyCallback(Callback<void> notifyAppFinish){
 }
 
 uint64_t RdmaQueuePair::GetBytesLeft(){
-	return m_size >= snd_nxt ? m_size - snd_nxt : 0;
+    if(isMulti) {
+        return m_size >= (path_snd_nxt[0] + path_snd_nxt[1]) ? m_size - (path_snd_nxt[0] + path_snd_nxt[1]) : 0;
+    }
+    else
+    	return m_size >= snd_nxt ? m_size - snd_nxt : 0;
 }
 
 uint32_t RdmaQueuePair::GetHash(void){
@@ -118,8 +128,18 @@ void RdmaQueuePair::Acknowledge(uint64_t ack){
 	}
 }
 
+void RdmaQueuePair::Acknowledge(uint32_t pathId, uint64_t ack) {
+    if(ack > path_snd_una[pathId]) {
+        path_snd_una[pathId] = ack;
+    }
+}
+
 uint64_t RdmaQueuePair::GetOnTheFly(){
-	return snd_nxt - snd_una;
+    if(isMulti) {
+        return (path_snd_nxt[0] - path_snd_una[0]) + (path_snd_nxt[1] - path_snd_una[1]);
+    }
+    else
+    	return snd_nxt - snd_una;
 }
 
 bool RdmaQueuePair::IsWinBound(){
@@ -156,7 +176,25 @@ uint64_t RdmaQueuePair::HpGetCurWin(){
 }
 
 bool RdmaQueuePair::IsFinished(){
-	return snd_una >= m_size;
+    if(isMulti) {
+        return (path_snd_una[0] + path_snd_una[1]) >= m_size;
+    }
+    else
+    	return snd_una >= m_size;
+}
+
+
+uint8_t RdmaQueuePair::GetNxtPathId() {
+    if((path_rtt[1] > path_rtt[0]) && (path_rtt[1] - path_rtt[0] > m_rate.CalculateTxTime(GetBytesLeft()))) {
+        m_curPathId = 0;
+    } else if((path_rtt[0] > path_rtt[1]) && (path_rtt[0] - path_rtt[1] > m_rate.CalculateTxTime(GetBytesLeft()))) {
+        m_curPathId = 1;
+    } else {
+        if(m_curPathId == 0)  m_curPathId = 1;
+        else    m_curPathId = 0;
+    }
+    // m_curPathId = 0;
+    return m_curPathId;
 }
 
 /*********************
@@ -179,6 +217,9 @@ RdmaRxQueuePair::RdmaRxQueuePair(){
 	m_lastNACK = 0;
     m_isFirstPkt = true;
     m_alpha = 0.6;      
+    path_ReceiverNextExpectedSeq[0] = path_ReceiverNextExpectedSeq[1] = 0;
+    path_lastNACK[0] = path_lastNACK[1] = 0;
+    path_nackTimer[0] = path_nackTimer[1] = Time(0);
 }
 
 uint32_t RdmaRxQueuePair::GetHash(void){
