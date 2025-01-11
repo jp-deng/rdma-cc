@@ -355,6 +355,9 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 	int x = 0;
     PathIdTag t;
     p->PeekPacketTag(t);
+
+    // std::cout << "recv " << t.GetPathId() << " " << ch.udp.pathSeq << std::endl;
+
     if(m_mp_mode)
         x = ReceiverCheckSeq(t.GetPathId(), ch.udp.pathSeq, rxQp, payload_size);
     else
@@ -468,6 +471,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
         p->PeekPacketTag(t);
         pathId = t.GetPathId();
         qp->path_rtt[pathId] = Simulator::Now().GetTimeStep() - rt.GetPathRtt();
+        // std::cout << "recv " << pathId << " " << ch.ack.pathSeq << " " << qp->path_rtt[pathId] << std::endl;
     }
 
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
@@ -488,6 +492,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	}
 	if (ch.l3Prot == 0xFD)  {
         // NACK 
+        std::cout << "nack-------\n";
         if(m_mp_mode)   RecoverQueue(pathId, qp);
 		else    RecoverQueue(qp);
     }
@@ -562,7 +567,7 @@ int RdmaHw::ReceiverCheckSeq(uint32_t pathId, uint32_t pathSeq, Ptr<RdmaRxQueueP
         //Generate ACK
         q->path_ReceiverNextExpectedSeq[pathId] = expected + size;
         return 1;
-    } else if (pathSeq > expected) {
+    } else if (pathSeq > expected) {     
         // Generate NACK
         if (Simulator::Now() >= q->path_nackTimer[pathId] || q->path_lastNACK[pathId] != expected){
             q->path_nackTimer[pathId] = Simulator::Now() + MicroSeconds(m_nack_interval);
@@ -663,6 +668,9 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
     if(m_mp_mode) {      
         pathId = qp->GetNxtPathId();
         seqTs.SetPathSeq(qp->path_snd_nxt[pathId]);
+
+        // std::cout << "send " << pathId << " " << qp->path_snd_nxt[pathId] << "  rtt1: " << qp->path_rtt[0] << " rtt2: " << qp->path_rtt[1] <<  std::endl;
+
         qp->path_snd_nxt[pathId] += payload_size;
     }
     p->AddPacketTag (PathIdTag (pathId)); 

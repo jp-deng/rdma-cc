@@ -334,25 +334,77 @@ uint64_t get_nic_rate(NodeContainer &n){
 		if (n.Get(i)->GetNodeType() == 0)
 			return DynamicCast<MpQbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
 }
+void CalculateMpOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    // a-->b-->c
+    for (int j = 0; j < OpticalSwitches.size(); j++){
+        Ptr<MemsNode> mems2 = OpticalSwitches[j];
+        if(mems2 != mems && mems2->m_isDay) {           
+            int bIndex = b->GetId() - Hosts.size() - OpticalSwitches.size() - ElectricSpineSwitches.size();
+            Ptr<SwitchNode> c = ElectricLeafSwitches[mems2->m_linkTable[bIndex]];
+                      
+            for (auto i = nbr2if[c].begin(); i != nbr2if[c].end(); i++){
+                Ptr<Node> dst = i->first;
+                if(dst->GetNodeType() == 0) {
+                    Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
+                    uint32_t interface = nbr2if[a][mems].idx;
+                    a->AddMpOpticalTableEntry(dstAddr, interface);
+                }
+            }	
+        }
+    }
+}
+
+void CalculateMpOpticalRoute() {
+    for(int j = 0; j < ElectricLeafSwitches.size(); j++) {
+        ElectricLeafSwitches[j]->ClearMpOpticalTableEntry();
+    }      
+
+    for (int i = 0; i < OpticalSwitches.size(); i++){
+        Ptr<MemsNode> mems = OpticalSwitches[i];
+        if(mems->m_isDay) {     
+            for(int j = 0; j < ElectricLeafSwitches.size(); j++) {
+                Ptr<SwitchNode> a = ElectricLeafSwitches[j];
+                Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[j]];
+                CalculateMpOpticalRoute(a, mems, b);
+            }      
+        }
+    }    
+}
 
 void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
     for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
         Ptr<Node> dst = i->first;
         if(dst->GetNodeType() == 0) {
             Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
-            uint32_t interface = nbr2if[b][mems].idx;
+            uint32_t interface = nbr2if[a][mems].idx;
             a->AddOpticalTableEntry(dstAddr, interface);
         }
-    }	
+    }
 }
+
+void ClearOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
+        Ptr<Node> dst = i->first;
+        if(dst->GetNodeType() == 0) {
+            Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
+            a->ClearOpticalTableEntry(dstAddr);
+        }
+    }
+}
+
+std::ofstream link_log("link_log.txt");
 
 void ConfigMems(int id) {
     Ptr<MemsNode> mems = OpticalSwitches[id];
     if(mems->m_isDay == true) {
         mems->m_isDay = false;        
-        for (int i = 0; i < ElectricLeafSwitches.size(); i++){
-            ElectricLeafSwitches[i]->ClearOpticalTable();        
+        for(int i = 0; i < mems->m_linkTable.size(); i++) {
+            Ptr<SwitchNode> a = ElectricLeafSwitches[i];
+            Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
+            ClearOpticalRoute(a, mems, b);           
         }
+        CalculateMpOpticalRoute();
+         
         Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
     }    
     else {
@@ -363,6 +415,8 @@ void ConfigMems(int id) {
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);           
         }
+        CalculateMpOpticalRoute();        
+        
         Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
     }
 }
@@ -376,6 +430,7 @@ void InitMemsConfig() {
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);
         }        
+        CalculateMpOpticalRoute();        
         Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
         initConfigTime += 50;
 	}

@@ -185,9 +185,9 @@ bool RdmaQueuePair::IsFinished(){
 
 
 uint8_t RdmaQueuePair::GetNxtPathId() {
-    if((path_rtt[1] > path_rtt[0]) && (path_rtt[1] - path_rtt[0] > m_rate.CalculateTxTime(GetBytesLeft()))) {
+    if((path_rtt[1] > path_rtt[0]) && ((2 * path_rtt[1] - 2 * path_rtt[0]) > m_rate.CalculateTxTime(GetBytesLeft()) * 10e9)) {
         m_curPathId = 0;
-    } else if((path_rtt[0] > path_rtt[1]) && (path_rtt[0] - path_rtt[1] > m_rate.CalculateTxTime(GetBytesLeft()))) {
+    } else if((path_rtt[0] > path_rtt[1]) && (2 * path_rtt[0] - 2 * path_rtt[1] > m_rate.CalculateTxTime(GetBytesLeft()))) {
         m_curPathId = 1;
     } else {
         if(m_curPathId == 0)  m_curPathId = 1;

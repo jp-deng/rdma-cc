@@ -103,8 +103,7 @@ int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch){
     else {
         if (m_rtOpticalTable.find(ch.dip) != m_rtOpticalTable.end()) {     
             return m_rtOpticalTable[ch.dip];
-        }
-        else {    
+        } else {    
            return GetElecOutDev(ch);     
         }
     }
@@ -126,14 +125,19 @@ void SwitchNode::CheckAndSendResume(uint32_t inDev, uint32_t qIndex){
 }
 
 void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
-    // std::cout << "elec: " << GetId() << std::endl;
+    // PathIdTag t;
+    // p->PeekPacketTag(t);
+    // if(t.GetPathId() == 0 && ch.l3Prot == 0x11 && ch.udp.pathSeq == 0) {
+    //     std::cout << GetId() << "  time: " << Simulator::Now().GetTimeStep() << " " << std::endl;
+    // }
+
 	int idx = GetOutDev(p, ch);
 	if (idx >= 0){
 		NS_ASSERT_MSG(m_devices[idx]->IsLinkUp(), "The routing table look up should return link that is up");
 
 		// determine the qIndex
 		uint32_t qIndex;
-		if (ch.l3Prot == 0xFF || ch.l3Prot == 0xFE || (m_ackHighPrio && (ch.l3Prot == 0xFD || ch.l3Prot == 0xFC)) || idx <= 8){  //QCN or PFC or NACK, go highest priority
+		if (ch.l3Prot == 0xFF || ch.l3Prot == 0xFE || (m_ackHighPrio && (ch.l3Prot == 0xFD || ch.l3Prot == 0xFC)) || idx <= 4){  //QCN or PFC or NACK or Optical, go highest priority
 			qIndex = 0;
 		}else{
 			qIndex = (ch.l3Prot == 0x06 ? 1 : ch.udp.pg); // if TCP, put to queue 1
@@ -210,22 +214,21 @@ void SwitchNode::ClearTable(){
 
 void SwitchNode::AddOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx){
 	uint32_t dip = dstAddr.Get();
-	m_rtOpticalTable[dip] = intf_idx;
+    m_rtOpticalTable[dip] = intf_idx;
 }
 
 void SwitchNode::ClearOpticalTableEntry(Ipv4Address &dstAddr){
 	uint32_t dip = dstAddr.Get();
-	m_rtOpticalTable.erase(dip);
+    m_rtOpticalTable.erase(dip);
 }
 
 void SwitchNode::AddMpOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx){
 	uint32_t dip = dstAddr.Get();
-	m_rtMpOpticalTable[dip] = intf_idx;
+    m_rtMpOpticalTable[dip] = intf_idx;
 }
 
-void SwitchNode::ClearMpOpticalTableEntry(Ipv4Address &dstAddr){
-	uint32_t dip = dstAddr.Get();
-	m_rtMpOpticalTable.erase(dip);
+void SwitchNode::ClearMpOpticalTableEntry(){
+    m_rtMpOpticalTable.clear();
 }
 
 // This function can only be called in switch mode

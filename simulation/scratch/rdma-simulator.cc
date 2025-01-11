@@ -39,11 +39,11 @@ using namespace std;
 
 NS_LOG_COMPONENT_DEFINE("GENERIC_SIMULATION");
 
-uint32_t cc_mode = 1;
+uint32_t cc_mode = 1, mp_mode = 0;
 bool enable_qcn = true, use_dynamic_pfc_threshold = true;
 uint32_t packet_payload_size = 1000, l2_chunk_size = 0, l2_ack_interval = 0;
 double pause_time = 5, simulator_stop_time = 3.01;
-std::string data_rate, link_delay, topology_file, flow_file, trace_file, trace_output_file;
+std::string data_rate, link_delay, topology_file, flow_file;
 std::string fct_output_file = "fct.txt";
 std::string pfc_output_file = "pfc.txt";
 
@@ -87,7 +87,7 @@ unordered_map<uint64_t, double> rate2pmax;
 /************************************************
  * Runtime varibles
  ***********************************************/
-std::ifstream topof, flowf, tracef;
+std::ifstream topof, flowf;
 
 NodeContainer n;
 
@@ -227,20 +227,17 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
-std::ofstream rate_log("rate_log2.txt");
+std::ofstream rate_log("rate_log.txt");
 #define IPV4CONVERT(id) Ipv4Address(0x0b000001 + ((id / 256) * 0x00010000) + ((id % 256) * 0x00000100))
 
 void monitor_rate() {
-    // Ptr<Node> h = Hosts[0];
-    // Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
-    // std::cout << qpg->GetN() << std::endl;
-    // for(int i = 0; i < qpg->GetN(); i++) {
-    //     Ptr<RdmaQueuePair> q = qpg->Get(i);
-    //     if(IPV4CONVERT(3) == q->sip && IPV4CONVERT(16) == q->dip) {
-    //         rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
-    //     }        
-    // }
-    // Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
+    Ptr<Node> h = Hosts[0];
+    Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    for(int i = 0; i < qpg->GetN(); i++) {
+        Ptr<RdmaQueuePair> q = qpg->Get(i);
+        rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+    }
+    Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
 }
 
 void PrintProgress(Time interval) {
@@ -336,24 +333,85 @@ uint64_t get_nic_rate(NodeContainer &n){
 			return DynamicCast<QbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
 }
 
+void CalculateMpOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    // a-->b-->c
+    for (int j = 0; j < OpticalSwitches.size(); j++){
+        Ptr<MemsNode> mems2 = OpticalSwitches[j];
+        if(mems2 != mems && mems2->m_isDay) {           
+            int bIndex = b->GetId() - Hosts.size() - OpticalSwitches.size() - ElectricSpineSwitches.size();
+            Ptr<SwitchNode> c = ElectricLeafSwitches[mems2->m_linkTable[bIndex]];
+                      
+            for (auto i = nbr2if[c].begin(); i != nbr2if[c].end(); i++){
+                Ptr<Node> dst = i->first;
+                if(dst->GetNodeType() == 0) {
+                    Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
+                    uint32_t interface = nbr2if[a][mems].idx;
+                    a->AddMpOpticalTableEntry(dstAddr, interface);
+                }
+            }	
+        }
+    }
+}
+
+void CalculateMpOpticalRoute() {
+    for(int j = 0; j < ElectricLeafSwitches.size(); j++) {
+        ElectricLeafSwitches[j]->ClearMpOpticalTableEntry();
+    }      
+
+    for (int i = 0; i < OpticalSwitches.size(); i++){
+        Ptr<MemsNode> mems = OpticalSwitches[i];
+        if(mems->m_isDay) {     
+            for(int j = 0; j < ElectricLeafSwitches.size(); j++) {
+                Ptr<SwitchNode> a = ElectricLeafSwitches[j];
+                Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[j]];
+                CalculateMpOpticalRoute(a, mems, b);
+            }      
+        }
+    }    
+}
+
 void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    // if(a->GetId() == 264)
+    //     std::cout << " +++ " << a->GetId() << "  " << b->GetId() << std::endl;
     for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
         Ptr<Node> dst = i->first;
         if(dst->GetNodeType() == 0) {
             Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
-            uint32_t interface = nbr2if[b][mems].idx;
+            uint32_t interface = nbr2if[a][mems].idx;
             a->AddOpticalTableEntry(dstAddr, interface);
         }
-    }	
+    }
 }
+
+void ClearOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
+    // if(a->GetId() == 264)
+    //     std::cout << " --- " << a->GetId() << "  " << b->GetId() << std::endl;
+    for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
+        Ptr<Node> dst = i->first;
+        if(dst->GetNodeType() == 0) {
+            Ipv4Address dstAddr = dst->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal();
+            a->ClearOpticalTableEntry(dstAddr);
+        }
+    }
+}
+
+std::ofstream link_log("link_log.txt");
 
 void ConfigMems(int id) {
     Ptr<MemsNode> mems = OpticalSwitches[id];
     if(mems->m_isDay == true) {
         mems->m_isDay = false;        
-        for (int i = 0; i < ElectricLeafSwitches.size(); i++){
-            ElectricLeafSwitches[i]->ClearOpticalTable();        
+        for(int i = 0; i < mems->m_linkTable.size(); i++) {
+            Ptr<SwitchNode> a = ElectricLeafSwitches[i];
+            Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
+            ClearOpticalRoute(a, mems, b);           
         }
+        if(mp_mode)
+            CalculateMpOpticalRoute();
+        // if(mems->m_linkTable[0] == 2) {
+        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
+        //         link_log << Simulator::Now().GetTimeStep() << std::endl; 
+        // }           
         Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
     }    
     else {
@@ -364,6 +422,12 @@ void ConfigMems(int id) {
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);           
         }
+        if(mp_mode)
+            CalculateMpOpticalRoute();        
+        // if(mems->m_linkTable[0] == 2) {
+        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
+        //         link_log << Simulator::Now().GetTimeStep() << " "; 
+        // }           
         Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
     }
 }
@@ -376,7 +440,13 @@ void InitMemsConfig() {
             Ptr<SwitchNode> a = ElectricLeafSwitches[i];
             Ptr<SwitchNode> b = ElectricLeafSwitches[mems->m_linkTable[i]];
             CalculateOpticalRoute(a, mems, b);
+            if(mp_mode)
+                CalculateMpOpticalRoute();            
         }        
+        // if(mems->m_linkTable[0] == 2) {
+        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
+        //         link_log << Simulator::Now().GetTimeStep() << " "; 
+        // }                 
         Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
         initConfigTime += 50;
 	}
@@ -493,24 +563,6 @@ int main(int argc, char *argv[])
 				flow_file = v;
 				std::cout << "FLOW_FILE\t\t\t" << flow_file << "\n";
 			}
-			else if (key.compare("TRACE_FILE") == 0)
-			{
-				std::string v;
-				conf >> v;
-				trace_file = v;
-				std::cout << "TRACE_FILE\t\t\t" << trace_file << "\n";
-			}
-			else if (key.compare("TRACE_OUTPUT_FILE") == 0)
-			{
-				std::string v;
-				conf >> v;
-				trace_output_file = v;
-				if (argc > 2)
-				{
-					trace_output_file = trace_output_file + std::string(argv[2]);
-				}
-				std::cout << "TRACE_OUTPUT_FILE\t\t" << trace_output_file << "\n";
-			}
 			else if (key.compare("SIMULATOR_STOP_TIME") == 0)
 			{
 				double v;
@@ -570,6 +622,9 @@ int main(int argc, char *argv[])
 			else if (key.compare("CC_MODE") == 0){
 				conf >> cc_mode;
 				std::cout << "CC_MODE\t\t" << cc_mode << '\n';
+			}else if (key.compare("MP_MODE") == 0){
+				conf >> mp_mode;
+				std::cout << "MP_MODE\t\t" << mp_mode << '\n';
 			}else if (key.compare("RATE_DECREASE_INTERVAL") == 0){
 				double v;
 				conf >> v;
@@ -732,11 +787,9 @@ int main(int argc, char *argv[])
 
 	topof.open(topology_file.c_str());
 	flowf.open(flow_file.c_str());
-	tracef.open(trace_file.c_str());
 	uint32_t node_num, electric_switch_num, optical_switch_num, link_num, trace_num;
 	topof >> node_num >> electric_switch_num >> optical_switch_num >> link_num;
 	flowf >> flow_num;
-	tracef >> trace_num;
 
 	std::vector<uint32_t> node_type(node_num, 0);
 	for (uint32_t i = 0; i < optical_switch_num; i++)
@@ -936,6 +989,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("L2ChunkSize", UintegerValue(l2_chunk_size));
 			rdmaHw->SetAttribute("L2AckInterval", UintegerValue(l2_ack_interval));
 			rdmaHw->SetAttribute("CcMode", UintegerValue(cc_mode));
+			rdmaHw->SetAttribute("MpMode", UintegerValue(mp_mode));
 			rdmaHw->SetAttribute("RateDecreaseInterval", DoubleValue(rate_decrease_interval));
 			rdmaHw->SetAttribute("MinRate", DataRateValue(DataRate(min_rate)));
 			rdmaHw->SetAttribute("Mtu", UintegerValue(packet_payload_size));
@@ -1030,7 +1084,6 @@ int main(int argc, char *argv[])
 	}
 
 	topof.close();
-	tracef.close();
 
 	// // schedule buffer monitor
 	// FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");

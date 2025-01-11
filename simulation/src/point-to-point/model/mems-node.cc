@@ -5,6 +5,7 @@
 #include "ns3/boolean.h"
 #include "ns3/uinteger.h"
 #include "ns3/double.h"
+#include "ns3/path-id-tag.h"
 #include "mems-node.h"
 #include "mems-link-matrix.h"
 #include "qbb-net-device.h"
@@ -80,6 +81,11 @@ void MemsNode::Reconfiguration(){
 }
 
 bool MemsNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch){
+    PathIdTag t;
+    packet->PeekPacketTag(t);
+    if(t.GetPathId() == 0 && ch.l3Prot == 0x11 && ch.udp.pathSeq == 0) {
+        std::cout << GetId() << " " << "  time: " << Simulator::Now().GetTimeStep() <<  std::endl;
+    }    
 	SendToDev(device->GetIfIndex(), packet);
 	return true;
 }

@@ -13,6 +13,7 @@ namespace ns3 {
 class Packet;
 
 class SwitchNode : public Node{
+public:    
 	static const uint32_t pCnt = 257;	// Number of ports used
 	static const uint32_t qCnt = 8;	// Number of queues/priorities used
 	uint32_t m_ecmpSeed;
@@ -53,7 +54,8 @@ public:
 	void AddOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
 	void ClearOpticalTableEntry(Ipv4Address &dstAddr);
 	void AddMpOpticalTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
-	void ClearMpOpticalTableEntry(Ipv4Address &dstAddr);
+	void ClearMpOpticalTableEntry();
+
 
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
