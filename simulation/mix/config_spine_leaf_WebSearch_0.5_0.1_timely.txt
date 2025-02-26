@@ -6,7 +6,6 @@ PACKET_PAYLOAD_SIZE 1000
 TOPOLOGY_FILE ../topology_gen/spine_leaf.txt
 FLOW_FILE ../traffic_gen/WebSearch_0.5_0.1.txt
 TRACE_FILE mix/trace.txt
-TRACE_OUTPUT_FILE mix/mix_spine_leaf_WebSearch_0.5_0.1_timely.tr
 FCT_OUTPUT_FILE mix/fct_spine_leaf_WebSearch_0.5_0.1_timely.txt
 PFC_OUTPUT_FILE mix/pfc_spine_leaf_WebSearch_0.5_0.1_timely.txt
 

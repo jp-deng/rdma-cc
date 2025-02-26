@@ -6,13 +6,21 @@ def process_file(file_path):
     large_flow_fct = []
     small_flow_fct = []
     packets = []
+    total_packet_size = 0
+    all_start_time = []
+    all_stop_time = []
 
     with open(file_path, 'r') as file:
         for line in file.readlines():
             data = line.strip().split(' ')
             packet_size = int(data[4])
+            start_time = float(data[5])
             fct_value = float(data[6])
 
+            total_packet_size += packet_size
+            
+            all_start_time.append(start_time)
+            all_stop_time.append(start_time + fct_value)
             all_fct.append(fct_value)
             packets.append(packet_size)
 
@@ -32,7 +40,13 @@ def process_file(file_path):
     fct_99 = all_fct[index_99]
     fct_95 = all_fct[index_95]
 
-    return average_fct, large_flow_average_fct, small_flow_average_fct, fct_99, fct_95
+    all_start_time.sort()
+    all_stop_time.sort()
+
+    total_time = all_stop_time[-1] - all_start_time[0]
+    average_goodput = total_packet_size * 8 / total_time / 256
+
+    return average_fct, large_flow_average_fct, small_flow_average_fct, fct_99, fct_95, average_goodput
 
 if __name__=="__main__":
     parser = OptionParser()
@@ -40,15 +54,18 @@ if __name__=="__main__":
     parser.add_option("-m", "--traffic_mode", dest="traffic_mode",
                       help="traffic_mode parameter value", default="WebSearch")
     parser.add_option("-l", "--traffic_load", dest="traffic_load",
-                      help="Value for the traffic_load parameter", default="0.3")
+                      help="Value for the traffic_load parameter", default="0.8")
     parser.add_option("-c", "--congestion_control", dest="congestion_control",
-                      help="congestion_control parameter value", default="newcc")
+                      help="congestion_control parameter value", default="dcqcn")
 
     options,args = parser.parse_args()
     file_path = "../simulation/mix/fct_spine_leaf_{}_{}_0.1_{}.txt".format(options.traffic_mode, options.traffic_load, options.congestion_control)
+    # file_path = "../simulation/mix/fct_spine_leaf_{}_{}.txt".format(options.traffic_mode, options.congestion_control)
     results = process_file(file_path)
-    print("平均FCT: {:.3e}".format(float(results[0])))
-    print("大流平均FCT: {:.3e}".format(float(results[1])))
-    print("小流平均FCT: {:.3e}".format(float(results[2])))
-    print("第99%大的FCT: {:.3e}".format(float(results[3])))
-    print("第95%大的FCT: {:.3e}".format(float(results[4])))
+    print("平均FCT: {:.2f} ms".format(float(results[0]) / 1e6))
+    print("大流平均FCT: {:.2f} ms".format(float(results[1]) / 1e6))
+    print("小流平均FCT: {:.2f} us".format(float(results[2]) / 1e3))
+    print("第99%大的FCT: {:.2f} ms".format(float(results[3]) / 1e6))
+    print("第95%大的FCT: {:.2f} ms".format(float(results[4]) / 1e6))
+    print("平均吞吐量: {:.2f} Gbps".format(float(results[5])))
+

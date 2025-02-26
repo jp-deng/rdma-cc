@@ -78,7 +78,7 @@ uint32_t buffer_size = 16;
 uint32_t qlen_dump_interval = 100000000, qlen_mon_interval = 100;
 uint64_t qlen_mon_start = 2000000000, qlen_mon_end = 2100000000;
 uint64_t link_mon_start = 2000000000;
-uint64_t rate_mon_start = 2000000000, rate_mon_interval = 10000;
+uint64_t rate_mon_start = 0, rate_mon_interval = 10000;
 string qlen_mon_file;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
@@ -227,7 +227,11 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
-std::ofstream rate_log("rate_log.txt");
+std::ofstream rate_log1("rate_log1.txt");
+std::ofstream rate_log2("rate_log2.txt");
+std::ofstream rate_log3("rate_log3.txt");
+std::ofstream rate_log4("rate_log4.txt");
+
 #define IPV4CONVERT(id) Ipv4Address(0x0b000001 + ((id / 256) * 0x00010000) + ((id % 256) * 0x00000100))
 
 void monitor_rate() {
@@ -235,8 +239,30 @@ void monitor_rate() {
     Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
     for(int i = 0; i < qpg->GetN(); i++) {
         Ptr<RdmaQueuePair> q = qpg->Get(i);
-        rate_log << Simulator::Now().GetTimeStep() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+        rate_log1 << Simulator::Now().GetMicroSeconds() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
     }
+
+    h = Hosts[1];
+    qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    for(int i = 0; i < qpg->GetN(); i++) {
+        Ptr<RdmaQueuePair> q = qpg->Get(i);
+        rate_log2 << Simulator::Now().GetMicroSeconds() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+    }
+
+    h = Hosts[2];
+    qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    for(int i = 0; i < qpg->GetN(); i++) {
+        Ptr<RdmaQueuePair> q = qpg->Get(i);
+        rate_log3 << Simulator::Now().GetMicroSeconds() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+    }
+
+    h = Hosts[3];
+    qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+    for(int i = 0; i < qpg->GetN(); i++) {
+        Ptr<RdmaQueuePair> q = qpg->Get(i);
+        rate_log4 << Simulator::Now().GetMicroSeconds() << ": " << q->m_rate.GetBitRate() * 1e-9 << std::endl;
+    }
+
     Simulator::Schedule(NanoSeconds(rate_mon_interval), &monitor_rate);  
 }
 
@@ -370,9 +396,16 @@ void CalculateMpOpticalRoute() {
     }    
 }
 
+std::ofstream link_log("link_log.txt");
+
 void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
-    // if(a->GetId() == 264)
-    //     std::cout << " +++ " << a->GetId() << "  " << b->GetId() << std::endl;
+    if(a->GetId() == 264 && b->GetId() == 265) {
+        Ptr<Node> h = Hosts[0];
+        Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
+        if(qpg->GetN() != 0)
+            link_log << Simulator::Now().GetMicroSeconds() << " " << Simulator::Now().GetMicroSeconds() + 180 << std::endl;
+    }
+
     for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
         Ptr<Node> dst = i->first;
         if(dst->GetNodeType() == 0) {
@@ -384,8 +417,6 @@ void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode
 }
 
 void ClearOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b){
-    // if(a->GetId() == 264)
-    //     std::cout << " --- " << a->GetId() << "  " << b->GetId() << std::endl;
     for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
         Ptr<Node> dst = i->first;
         if(dst->GetNodeType() == 0) {
@@ -394,8 +425,6 @@ void ClearOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode> b)
         }
     }
 }
-
-std::ofstream link_log("link_log.txt");
 
 void ConfigMems(int id) {
     Ptr<MemsNode> mems = OpticalSwitches[id];
@@ -408,10 +437,6 @@ void ConfigMems(int id) {
         }
         if(mp_mode)
             CalculateMpOpticalRoute();
-        // if(mems->m_linkTable[0] == 2) {
-        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
-        //         link_log << Simulator::Now().GetTimeStep() << std::endl; 
-        // }           
         Simulator::Schedule(MicroSeconds(20), &ConfigMems, id);
     }    
     else {
@@ -424,10 +449,6 @@ void ConfigMems(int id) {
         }
         if(mp_mode)
             CalculateMpOpticalRoute();        
-        // if(mems->m_linkTable[0] == 2) {
-        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
-        //         link_log << Simulator::Now().GetTimeStep() << " "; 
-        // }           
         Simulator::Schedule(MicroSeconds(180), &ConfigMems, id);   
     }
 }
@@ -443,10 +464,6 @@ void InitMemsConfig() {
             if(mp_mode)
                 CalculateMpOpticalRoute();            
         }        
-        // if(mems->m_linkTable[0] == 2) {
-        //     if(Simulator::Now().GetTimeStep() >= link_mon_start)
-        //         link_log << Simulator::Now().GetTimeStep() << " "; 
-        // }                 
         Simulator::Schedule(MicroSeconds(initConfigTime), &ConfigMems, i);
         initConfigTime += 50;
 	}

@@ -81,11 +81,6 @@ void MemsNode::Reconfiguration(){
 }
 
 bool MemsNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch){
-    PathIdTag t;
-    packet->PeekPacketTag(t);
-    if(t.GetPathId() == 0 && ch.l3Prot == 0x11 && ch.udp.pathSeq == 0) {
-        std::cout << GetId() << " " << "  time: " << Simulator::Now().GetTimeStep() <<  std::endl;
-    }    
 	SendToDev(device->GetIfIndex(), packet);
 	return true;
 }

@@ -82,7 +82,7 @@ int SwitchNode::GetElecOutDev(CustomHeader &ch) {
         buf.u32[2] = ch.ack.sport | ((uint32_t)ch.ack.dport << 16);
 
     uint32_t idx = EcmpHash(buf.u8, 12, m_ecmpSeed) % nexthops.size();
-    // std::cout << nexthops[idx] << std::endl;
+    // idx = 0;
     return nexthops[idx];
 }
 

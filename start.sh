@@ -9,7 +9,7 @@ cd ..
 cd traffic_gen
 param_load=$1
 param_time=0.1
-param_cdf=WebSearch
+param_cdf=FbHdp
 traffic_file="${param_cdf}_${param_load}_${param_time}.txt"
 if [ ! -f $traffic_file ]; then
     python traffic_gen.py -c ${param_cdf}.txt -l $param_load -t $param_time -o $traffic_file
