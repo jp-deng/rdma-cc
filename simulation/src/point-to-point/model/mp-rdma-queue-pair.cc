@@ -32,6 +32,7 @@ namespace ns3
           startTime(Simulator::Now())
 
     {
+        lostpkts = 0;
         // generate new virtual path
         VirtualPath vp;
         // source should be from 49152 to 65535

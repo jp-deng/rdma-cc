@@ -62,6 +62,7 @@ namespace ns3
         uint32_t m_mtu;   // Maximum Transmission Unit (MTU) of the Queue Pair
         DataRate m_rate;  // Current rate
         Time startTime;   // flow start time
+        uint64_t lostpkts;
     };
 
     class MpRdmaRxQueuePair : public Object

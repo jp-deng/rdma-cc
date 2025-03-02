@@ -90,12 +90,11 @@ namespace ns3 {
 		}
 		return 0;
 	}
-	int MpRdmaEgressQueue::GetNextQindex(bool paused[]){
+	int MpRdmaEgressQueue::GetNextQindex(bool paused[], Ptr<Node> m_node){
 		bool found = false;
 		uint32_t qIndex;
 		if (!paused[ack_q_idx] && m_ackQ->GetNPackets() > 0)
 			return -1;
-
 		// no pkt in highest priority queue, do rr for each qp
 		int res = -1024;
 		uint32_t fcount = m_qpGrp->GetN();
@@ -261,8 +260,9 @@ namespace ns3 {
 		if (!m_linkUp) return; // if link is down, return
 		if (m_txMachineState == BUSY) return;	// Quit if channel busy
 		Ptr<Packet> p;
-		if (m_node->GetNodeType() == 0){
-			int qIndex = m_rdmaEQ->GetNextQindex(m_paused);
+		if (m_node->GetNodeType() == 0){       
+			int qIndex = m_rdmaEQ->GetNextQindex(m_paused, GetNode());     
+
 			if (qIndex != -1024){
 				if (qIndex == -1){ // high prio
 					p = m_rdmaEQ->DequeueQindex(qIndex);
@@ -273,7 +273,6 @@ namespace ns3 {
 				// a qp dequeue a packet
 				Ptr<MpRdmaQueuePair> lastQp = m_rdmaEQ->GetQp(qIndex);
 				p = m_rdmaEQ->DequeueQindex(qIndex);
-
 				// transmit
 				m_traceQpDequeue(p, lastQp);
 				TransmitStart(p);

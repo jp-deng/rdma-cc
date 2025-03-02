@@ -77,6 +77,7 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     path_snd_una[0] = path_snd_una[1] = 0;
     m_curPathId = 1;
     isMulti = false;
+    lostpkts = 0;
 }
 
 void RdmaQueuePair::SetSize(uint64_t size){

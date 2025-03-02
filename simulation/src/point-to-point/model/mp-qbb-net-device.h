@@ -33,7 +33,7 @@ namespace ns3
         static TypeId GetTypeId(void);
         MpRdmaEgressQueue();
         Ptr<Packet> DequeueQindex(int qIndex);
-        int GetNextQindex(bool paused[]);
+        int GetNextQindex(bool paused[], Ptr<Node> m_node);
         int GetLastQueue();
         uint32_t GetNBytes(uint32_t qIndex);
         uint32_t GetFlowCount(void);
@@ -114,7 +114,7 @@ namespace ns3
         TracedCallback<Ptr<const Packet>, uint32_t> m_traceDequeue;
         TracedCallback<Ptr<const Packet>, uint32_t> m_traceDrop;
         TracedCallback<uint32_t> m_tracePfc; // 0: resume, 1: pause
-    protected:
+    public:
         // Ptr<Node> m_node;
 
         bool TransmitStart(Ptr<Packet> p);

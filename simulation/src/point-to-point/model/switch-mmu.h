@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <ns3/node.h>
+#include "ns3/conweave-routing.h"
 
 namespace ns3 {
 
@@ -41,7 +42,9 @@ public:
 	void ConfigNPort(uint32_t n_port);
 	void ConfigBufferSize(uint32_t size);
 
-	// config
+    ConWeaveRouting m_conweaveRouting;
+	
+    // config
 	uint32_t node_id;
 	uint32_t buffer_size;
 	uint32_t pfc_a_shift[pCnt];

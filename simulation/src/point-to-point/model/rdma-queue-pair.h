@@ -28,6 +28,7 @@ public:
 	Time m_nextAvail;	//< Soonest time of next send
 	uint32_t wp; // current window of packets
 	uint32_t lastPktSize;
+    uint64_t lostpkts;
 	Callback<void> m_notifyAppFinish;
 
 	/******************************

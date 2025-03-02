@@ -59,11 +59,11 @@ namespace ns3
 
     Ptr<Packet> MpRdmaHw::GetNxtPacket(Ptr<MpRdmaQueuePair> qp)
     {
-        // printf("GetNxtPacket()\n");
+
         // return null if no more packets to send
         if (qp->m_vpQueue.empty())
         {
-            // printf("m_vpQueue is empty\n");
+            printf("m_vpQueue is empty\n");
             return nullptr;
         }
 
@@ -97,7 +97,7 @@ namespace ns3
             // printf("qp->m_size / m_mtu: %llu\n", qp->m_size / m_mtu);
             if (qp->m_lastSyncTime.GetTimeStep() + m_alpha * m_delta / (qp->m_cwnd / qp->m_baseRtt) <
                     static_cast<double>(Simulator::Now().GetTimeStep()) ||
-                (qp->m_size + (m_mtu - 1)) / m_mtu == qp->snd_done)
+                (qp->m_size + (m_mtu - 1)) / m_mtu == qp->snd_done + 1)
             {
                 // rocev2.SetSynchronise(1);
                 // printf("SetSynchronise(1)\n");
@@ -116,7 +116,7 @@ namespace ns3
         }
         else if (qp->m_mode == MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY)
         {
-            // std::cout << "recovery \n\n\n" << std::endl;
+            std::cout << "recovery \n\n\n" << std::endl;
             uint32_t payload_size = qp->snd_retx == qp->m_size / m_mtu ? qp->m_size % m_mtu : m_mtu;
             p = Create<Packet>(payload_size);
             // recovery mode
@@ -242,19 +242,19 @@ namespace ns3
                                                    0));
         // default set ACK
         head.SetProtocol(0xFC);
+
         // printf("ch.udp.synchronise = %u\n", ch.udp.synchronise);
         if (ch.udp.synchronise == 1 && !doSynch(rxMpQp))
         {
             // if sync fail set NACK
             head.SetProtocol(0xFD);
-            seqh.SetSeq(rxMpQp->aack + 1);
+            seqh.SetSeq(rxMpQp->aack);
         }
         head.SetTtl(64);
         head.SetPayloadSize(newp->GetSize());
         head.SetIdentification(rxMpQp->m_ipid++);
         seqh.SetReTx(ch.udp.ReTx);  // set ReTx rely on the send packet
         seqh.SetAACK(rxMpQp->aack); // set AACK
-        // printf("seqh.GetAACK(): %u\n", seqh.GetAACK());
         // add headers in order
         // newp->AddHeader(roCEv2AckH);
         newp->AddHeader(seqh);
@@ -310,10 +310,48 @@ namespace ns3
 
         if (ch.l3Prot == 0xFD)
         { // NACK
-            printf("NACK ch.ack.seq: %u\n", ch.ack.seq);
-            // qp->m_mode = MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY;
-            // qp->snd_retx = ch.ack.seq;
-            // qp->recovery = qp->snd_done;
+            printf("NACK ch.ack.seq: %u, %u, %u\n", ch.ack.seq, m_node->GetId(), qp->m_size);
+            qp->m_mode = MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY;
+            qp->snd_retx = ch.ack.seq;
+            qp->recovery = qp->snd_done;
+            // if (qp->IsFinished())
+            // {
+            //     Ptr<Packet> p;
+            //     SeqTsHeader seqTs;
+            //     UdpHeader udpHeader;
+            //     Ipv4Header ipHeader;
+            //     PppHeader ppp;
+            //     uint32_t payload_size = qp->snd_retx == qp->m_size / m_mtu ? qp->m_size % m_mtu : m_mtu;
+            //     p = Create<Packet>(payload_size);
+            //     seqTs.SetReTx(1);
+            //     seqTs.SetSynchronise(1);
+            //     seqTs.SetSeq(qp->snd_retx);
+            //     seqTs.SetPG(qp->m_pg);
+            //     udpHeader.SetDestinationPort(qp->dport); // destination port
+            //     udpHeader.SetSourcePort(qp->sport);
+
+            //     ipHeader.SetSource(qp->sip);            // source IP addresses
+            //     ipHeader.SetDestination(qp->dip);       // destination IP addresses
+            //     ipHeader.SetProtocol(0x11);             // protocol type (UDP)
+            //     ipHeader.SetPayloadSize(p->GetSize());  // payload size
+            //     ipHeader.SetTtl(64);                    // TTL
+            //     ipHeader.SetTos(0);                     // Type of Service (Tos)
+            //     ipHeader.SetIdentification(qp->m_ipid); // identification
+
+            //     ppp.SetProtocol(0x0021); // EtherToPpp(0x800), see point-to-point-net-device.cc
+
+            //     // p->AddHeader(rocev2);
+            //     p->AddHeader(seqTs);
+            //     p->AddHeader(udpHeader);
+            //     p->AddHeader(ipHeader);
+            //     p->AddHeader(ppp);        
+
+            //     dev->TransmitStart(p);        
+
+                // uint8_t numSend = qp->recovery - qp->snd_retx;
+                // qp->m_vpQueue.push({ch.ack.dport, numSend, 1});
+                // dev->TriggerTransmit();
+            // }            
         }
         else if (ch.l3Prot == 0xFC)
         { // ACK
@@ -340,6 +378,7 @@ namespace ns3
             { // update m_inflate, snd_una
                 qp->m_inflate -= ch.ack.AACK - qp->snd_una;
                 qp->snd_una = ch.ack.AACK;
+
                 if (qp->m_mode == MpRdmaQueuePair::Mode::MP_RDMA_HW_MODE_RECOVERY &&
                     qp->snd_una >= qp->recovery)
                 {

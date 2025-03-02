@@ -42,8 +42,13 @@ private:
 	static uint32_t EcmpHash(const uint8_t* key, size_t len, uint32_t seed);
 	void CheckAndSendPfc(uint32_t inDev, uint32_t qIndex);
 	void CheckAndSendResume(uint32_t inDev, uint32_t qIndex);
+    void DoSwitchSend(Ptr<Packet> p, CustomHeader &ch, uint32_t idx, uint32_t qIndex);
+    void SendToDevContinue(Ptr<Packet> p, CustomHeader &ch);    
+
 public:
 	Ptr<SwitchMmu> m_mmu;
+    bool m_isToR;                                 // true if ToR switch
+    std::unordered_set<uint32_t> m_isToR_hostIP;  // host's IP connected to this ToR
     uint32_t opticalPort = 0;
 
 	static TypeId GetTypeId (void);

@@ -11,6 +11,7 @@
 #include "ppp-header.h"
 #include "ns3/int-header.h"
 #include "ns3/path-id-tag.h"
+#include "ns3/settings.h"
 #include <cmath>
 
 namespace ns3 {
@@ -45,9 +46,15 @@ TypeId SwitchNode::GetTypeId (void)
 }
 
 SwitchNode::SwitchNode(){
+    m_isToR = false;
 	m_ecmpSeed = m_id;
 	m_node_type = 1;
 	m_mmu = CreateObject<SwitchMmu>();
+    // ConWeave's Callback for switch functions
+    m_mmu->m_conweaveRouting.SetSwitchSendCallback(MakeCallback(&SwitchNode::DoSwitchSend, this));
+    m_mmu->m_conweaveRouting.SetSwitchSendToDevCallback(
+        MakeCallback(&SwitchNode::SendToDevContinue, this));
+
 	for (uint32_t i = 0; i < pCnt; i++)
 		m_txBytes[i] = 0;
 	for (uint32_t i = 0; i < pCnt; i++)
@@ -131,6 +138,15 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
     //     std::cout << GetId() << "  time: " << Simulator::Now().GetTimeStep() << " " << std::endl;
     // }
 
+    // ConWeave
+    if (Settings::lb_mode == 9) {
+        m_mmu->m_conweaveRouting.RouteInput(p, ch);
+        return;
+    }
+    SendToDevContinue(p, ch);
+}
+
+void SwitchNode::SendToDevContinue(Ptr<Packet> p, CustomHeader &ch) {
 	int idx = GetOutDev(p, ch);
 	if (idx >= 0){
 		NS_ASSERT_MSG(m_devices[idx]->IsLinkUp(), "The routing table look up should return link that is up");
@@ -142,6 +158,17 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 		}else{
 			qIndex = (ch.l3Prot == 0x06 ? 1 : ch.udp.pg); // if TCP, put to queue 1
 		}
+
+        DoSwitchSend(p, ch, idx, qIndex);
+        return;
+
+	}else
+		return; // Drop
+
+}
+
+
+void SwitchNode::DoSwitchSend(Ptr<Packet> p, CustomHeader &ch, uint32_t idx, uint32_t qIndex) {
 
 		// admission control
 		FlowIdTag t;
@@ -157,8 +184,7 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch){
 			CheckAndSendPfc(inDev, qIndex);
 		}
 		m_devices[idx]->SwitchSend(qIndex, p, ch);
-	}else
-		return; // Drop
+
 }
 
 uint32_t SwitchNode::EcmpHash(const uint8_t* key, size_t len, uint32_t seed) {

@@ -493,6 +493,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	if (ch.l3Prot == 0xFD)  {
         // NACK 
         std::cout << "nack-------\n";
+        qp->lostpkts++;
         if(m_mp_mode)   RecoverQueue(pathId, qp);
 		else    RecoverQueue(qp);
     }

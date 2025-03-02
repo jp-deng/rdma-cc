@@ -24,7 +24,6 @@
 #include "ns3/conweave-routing.h"
 #include "ns3/ipv4-header.h"
 #include "ns3/log.h"
-#include "ns3/settings.h"
 #include "ns3/simulator.h"
 
 NS_LOG_COMPONENT_DEFINE("ConWeaveVOQ");

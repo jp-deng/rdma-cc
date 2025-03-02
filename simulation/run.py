@@ -103,6 +103,8 @@ if __name__ == "__main__":
 		output_file = "%s_%s_%s"%(topo, trace, args.mp)
 	elif args.mp == "mprdma":
 		output_file = "%s_%s_%s"%(topo, trace, args.mp)
+	elif args.mp == "conweave":
+		output_file = "%s_%s_%s"%(topo, trace, args.mp)
 
 	config_name = "mix/config_%s.txt"%(output_file)
 
