@@ -116,7 +116,7 @@ namespace ns3
         }
         else if (qp->m_mode == MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY)
         {
-            std::cout << "recovery \n\n\n" << std::endl;
+            // std::cout << "recovery \n\n\n" << std::endl;
             uint32_t payload_size = qp->snd_retx == qp->m_size / m_mtu ? qp->m_size % m_mtu : m_mtu;
             p = Create<Packet>(payload_size);
             // recovery mode
@@ -128,7 +128,7 @@ namespace ns3
         else
         {
 #if PRINT_LOG
-            std::cout << "Unknown mode" << std::endl;
+            // std::cout << "Unknown mode" << std::endl;
 #endif
         }
         seqTs.SetPG(qp->m_pg);
@@ -190,6 +190,7 @@ namespace ns3
             // out of window, drop the packet
             return 1;
         }
+  
         // printf("ch.udp.seq = %u\n", ch.udp.seq);
         // printf("rxMpQp->aack = %u\n", rxMpQp->aack);
         // printf("ch.udp.seq < rxMpQp->aack = %d\n", ch.udp.seq < rxMpQp->aack);
@@ -292,7 +293,7 @@ namespace ns3
         Ptr<MpRdmaQueuePair> qp = GetQp(ch.sip, ch.ack.sport, ch.udp.pg);
         if (qp == NULL){
             // std::cout << Ipv4Address(ch.dip) << " ---> " << Ipv4Address(ch.sip) << "  psn: " << ch.ack.seq << std::endl;
-            std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
+            // std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
             return 0;
         }        
         uint32_t nic_idx = GetNicIdxOfQp(qp);
@@ -314,6 +315,7 @@ namespace ns3
             qp->m_mode = MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY;
             qp->snd_retx = ch.ack.seq;
             qp->recovery = qp->snd_done;
+                dev->TriggerTransmit();
             // if (qp->IsFinished())
             // {
             //     Ptr<Packet> p;
@@ -416,7 +418,7 @@ namespace ns3
         else
         {
 #if PRINT_LOG
-            std::cout << "Received packets other than ACK & NACK" << std::endl;
+            // std::cout << "Received packets other than ACK & NACK" << std::endl;
 #endif
         }
 
@@ -439,7 +441,7 @@ namespace ns3
         {
 // other protocol packet
 // #if PRINT_LOG
-            std::cout << "Receive other protocol packet" << std::endl;
+            // std::cout << "Receive other protocol packet" << std::endl;
 // #endif
             return 1;
         }
@@ -512,7 +514,7 @@ namespace ns3
     Ptr<MpRdmaRxQueuePair> MpRdmaHw::GetRxQp(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport,
                                              uint16_t pg, bool create)
     {
-        uint64_t key = GetQpKey(dip, sport, pg);
+        uint64_t key = GetQpKey(dip, dport, pg);
         auto it = m_rxMpQpMap.find(key);
         if (it != m_rxMpQpMap.end())
             return it->second;

@@ -102,6 +102,12 @@ namespace ns3 {
 		for (qIndex = 1; qIndex <= fcount; qIndex++){
 			uint32_t idx = (qIndex + m_rrlast) % fcount;
 			Ptr<MpRdmaQueuePair> qp = m_qpGrp->Get(idx);
+            
+            if(qp->m_mode == MpRdmaQueuePair::MP_RDMA_HW_MODE_RECOVERY) {
+                res = idx;
+                break;
+            }
+
 			if (!paused[qp->m_pg] && qp->GetBytesLeft() > 0 && !qp->IsWinBound()){
 				if (m_qpGrp->Get(idx)->m_nextAvail.GetTimeStep() > Simulator::Now().GetTimeStep()) //not available now
 					continue;
@@ -112,18 +118,18 @@ namespace ns3 {
 			}
 		}
 
-		// clear the finished qp
-		if (min_finish_id < 0xffffffff){
-			int nxt = min_finish_id;
-			auto &qps = m_qpGrp->m_qps;
-			for (int i = min_finish_id + 1; i < fcount; i++) if (!qps[i]->IsFinished()){
-				if (i == res) // update res to the idx after removing finished qp
-					res = nxt;
-				qps[nxt] = qps[i];
-				nxt++;
-			}
-			qps.resize(nxt);
-		}
+		// // clear the finished qp
+		// if (min_finish_id < 0xffffffff){
+		// 	int nxt = min_finish_id;
+		// 	auto &qps = m_qpGrp->m_qps;
+		// 	for (int i = min_finish_id + 1; i < fcount; i++) if (!qps[i]->IsFinished()){
+		// 		if (i == res) // update res to the idx after removing finished qp
+		// 			res = nxt;
+		// 		qps[nxt] = qps[i];
+		// 		nxt++;
+		// 	}
+		// 	qps.resize(nxt);
+		// }
 		return res;
 	}
 
@@ -262,7 +268,8 @@ namespace ns3 {
 		Ptr<Packet> p;
 		if (m_node->GetNodeType() == 0){       
 			int qIndex = m_rdmaEQ->GetNextQindex(m_paused, GetNode());     
-
+            // if(m_node->GetId() == 23)
+            //     std::cout << qIndex << "---------" << std::endl;
 			if (qIndex != -1024){
 				if (qIndex == -1){ // high prio
 					p = m_rdmaEQ->DequeueQindex(qIndex);
@@ -273,10 +280,23 @@ namespace ns3 {
 				// a qp dequeue a packet
 				Ptr<MpRdmaQueuePair> lastQp = m_rdmaEQ->GetQp(qIndex);
 				p = m_rdmaEQ->DequeueQindex(qIndex);
+
+                if(p == nullptr) {
+					Time t = Simulator::GetMaximumSimulationTime();
+					for (uint32_t i = 0; i < m_rdmaEQ->GetFlowCount(); i++){
+						Ptr<MpRdmaQueuePair> qp = m_rdmaEQ->GetQp(i);
+						if (qp->GetBytesLeft() == 0)
+							continue;
+						t = Min(qp->m_nextAvail, t);
+					}                    
+                    if (m_nextSend.IsExpired() && t < Simulator::GetMaximumSimulationTime() && t > Simulator::Now()){
+						m_nextSend = Simulator::Schedule(t - Simulator::Now(), &MpQbbNetDevice::DequeueAndTransmit, this);
+					}
+                    return;
+                }
 				// transmit
 				m_traceQpDequeue(p, lastQp);
-				TransmitStart(p);
-
+				TransmitStart(p);                
 				// update for the next avail time
 				m_rdmaPktSent(lastQp, p, m_tInterframeGap);
 			}else { // no packet to send
@@ -450,14 +470,14 @@ namespace ns3 {
 		MpQbbNetDevice::TransmitStart(Ptr<Packet> p)
 	{
 		NS_LOG_FUNCTION(this << p);
-		NS_LOG_LOGIC("UID is " << p->GetUid() << ")");
+		// NS_LOG_LOGIC("UID is " << p->GetUid() << ")");
 		//
 		// This function is called to start the process of transmitting a packet.
 		// We need to tell the channel that we've started wiggling the wire and
 		// schedule an event that will be executed when the transmission is complete.
 		//
-        if(m_txMachineState != READY)
-            std::cout << m_node->GetId() << ": " << m_ifIndex << ": " << m_bps.CalculateTxTime(p->GetSize()) << std::endl;
+        // if(m_txMachineState != READY)
+        //     std::cout << m_node->GetId() << ": " << m_ifIndex << ": " << m_bps.CalculateTxTime(p->GetSize()) << std::endl;
 		NS_ASSERT_MSG(m_txMachineState == READY, "Must be READY to transmit");
 		m_txMachineState = BUSY;
 		m_currentPkt = p;

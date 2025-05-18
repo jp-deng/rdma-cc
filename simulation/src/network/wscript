@@ -62,6 +62,7 @@ def build(bld):
 		'utils/int-header.cc',
         'utils/path-id-tag.cc',
         'utils/path-rtt-tag.cc',
+        'utils/timestamp-tag.cc',        
         ]
 
     network_test = bld.create_ns3_module_test_library('network')
@@ -143,6 +144,7 @@ def build(bld):
 		'utils/int-header.h',
         'utils/path-id-tag.h',
         'utils/path-rtt-tag.h',
+        'utils/timestamp-tag.h',        
         ]
 
     if (bld.env['ENABLE_EXAMPLES']):

@@ -220,7 +220,7 @@ namespace ns3 {
 
 	QbbNetDevice::QbbNetDevice()
 	{
-		NS_LOG_FUNCTION(this);
+		// NS_LOG_FUNCTION(this);
 		m_ecn_source = new std::vector<ECNAccount>;
 		for (uint32_t i = 0; i < qCnt; i++){
 			m_paused[i] = false;
@@ -457,8 +457,8 @@ namespace ns3 {
 		// We need to tell the channel that we've started wiggling the wire and
 		// schedule an event that will be executed when the transmission is complete.
 		//
-        if(m_txMachineState != READY)
-            std::cout << m_node->GetId() << ": " << m_ifIndex << ": " << m_bps.CalculateTxTime(p->GetSize()) << std::endl;
+        // if(m_txMachineState != READY)
+        //     std::cout << m_node->GetId() << ": " << m_ifIndex << ": " << m_bps.CalculateTxTime(p->GetSize()) << std::endl;
 		NS_ASSERT_MSG(m_txMachineState == READY, "Must be READY to transmit");
 		m_txMachineState = BUSY;
 		m_currentPkt = p;

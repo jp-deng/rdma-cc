@@ -148,6 +148,7 @@ public:
 	uint32_t path_ReceiverNextExpectedSeq[2];
     uint32_t path_lastNACK[2];
     Time path_nackTimer[2];
+    uint64_t delaySum;
 
 	static TypeId GetTypeId (void);
 	RdmaRxQueuePair();

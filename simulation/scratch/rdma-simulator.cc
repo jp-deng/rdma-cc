@@ -34,6 +34,7 @@
 #include <ns3/switch-node.h>
 #include <ns3/sim-setting.h>
 #include "ns3/settings.h"
+#include "ns3/flow-monitor-module.h"
 
 using namespace ns3;
 using namespace std;
@@ -78,7 +79,7 @@ uint32_t buffer_size = 16;
 
 uint32_t qlen_dump_interval = 100000000, qlen_mon_interval = 100;
 uint64_t qlen_mon_start = 2000000000, qlen_mon_end = 2100000000;
-uint64_t link_mon_start = 1999000000;
+uint64_t link_mon_start = 0;
 uint64_t rate_mon_start = 0, rate_mon_interval = 10000;
 string qlen_mon_file;
 
@@ -133,6 +134,16 @@ std::vector<Ipv4Address> serverAddress;
 // maintain port number for each host pair
 std::unordered_map<uint32_t, unordered_map<uint32_t, uint16_t> > portNumder;
 
+struct FlowQuintet_t
+{
+    ns3::Ipv4Address srcAddr;
+    ns3::Ipv4Address dstAddr;
+    uint64_t srcPort;
+    uint64_t dstPort; uint32_t protocol = 4; 
+}; 
+FlowMonitorHelper flowmon;
+void Monitor_flow(Ptr<FlowMonitor> monitor);
+
 struct FlowInput{
 	uint32_t src, dst, pg, maxPacketCount, port, dport;
 	double start_time;
@@ -178,18 +189,22 @@ uint32_t ip_to_node_id(Ipv4Address ip){
 uint64_t total_fct = 0, total_flow_num = 0;
 void qp_finish(FILE* fout, Ptr<RdmaQueuePair> q){
 	uint32_t sid = ip_to_node_id(q->sip), did = ip_to_node_id(q->dip);
+
+	Ptr<Node> dstNode = n.Get(did);
+	Ptr<RdmaDriver> rdma = dstNode->GetObject<RdmaDriver> ();    
+    Ptr<RdmaRxQueuePair> rxQp = rdma->m_rdma->GetRxQp(q->dip.Get(), q->sip.Get(), q->dport, q->sport, q->m_pg, false);
+
 	uint64_t base_rtt = pairRtt[sid][did], b = pairBw[sid][did];
 	uint32_t total_bytes = q->m_size + ((q->m_size-1) / packet_payload_size + 1) * (CustomHeader::GetStaticWholeHeaderSize() - IntHeader::GetStaticSize()); // translate to the minimum bytes required (with header but no INT)
 	uint64_t standalone_fct = base_rtt + total_bytes * 8000000000lu / b;
 	// sip, dip, sport, dport, size (B), start_time, fct (ns), standalone_fct (ns)
-	fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts);
+	fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts, rxQp->delaySum);
 	fflush(fout);
+	// printf("%08x %08x %u %u %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts);
 
     total_flow_num++;
     total_fct += (Simulator::Now() - q->startTime).GetTimeStep();
 	// remove rxQp from the receiver
-	Ptr<Node> dstNode = n.Get(did);
-	Ptr<RdmaDriver> rdma = dstNode->GetObject<RdmaDriver> ();
 	rdma->m_rdma->DeleteRxQp(q->sip.Get(), q->m_pg, q->sport);
 }
 
@@ -413,8 +428,9 @@ void CalculateOpticalRoute(Ptr<SwitchNode> a, Ptr<MemsNode> mems, Ptr<SwitchNode
     if(a->GetId() == 264 && b->GetId() == 265) {
         Ptr<Node> h = Hosts[0];
         Ptr<RdmaQueuePairGroup> qpg = DynamicCast<QbbNetDevice>(h->GetDevice(1))->m_rdmaEQ->m_qpGrp;
-        if(qpg->GetN() != 0)
+        if(qpg->GetN() != 0) {
             link_log << Simulator::Now().GetMicroSeconds() << " " << Simulator::Now().GetMicroSeconds() + 180 << std::endl;
+        }
     }
 
     for (auto i = nbr2if[b].begin(); i != nbr2if[b].end(); i++){
@@ -479,6 +495,8 @@ void InitMemsConfig() {
         initConfigTime += 50;
 	}
 }
+
+uint32_t cc_index = 0;
 
 int main(int argc, char *argv[])
 {
@@ -650,6 +668,11 @@ int main(int argc, char *argv[])
 			else if (key.compare("CC_MODE") == 0){
 				conf >> cc_mode;
 				std::cout << "CC_MODE\t\t" << cc_mode << '\n';
+                if(cc_mode == 1)    cc_index = 0;
+                if(cc_mode == 7)    cc_index = 1;
+                if(cc_mode == 3)    cc_index = 2;
+                if(cc_mode == 6)    cc_index = 3;
+
 			}else if (key.compare("MP_MODE") == 0){
 				conf >> mp_mode;
 				std::cout << "MP_MODE\t\t" << mp_mode << '\n';
@@ -808,7 +831,7 @@ int main(int argc, char *argv[])
 	if (cc_mode == 10){
 		Pint::set_log_base(pint_log_base);
 		IntHeader::pint_bytes = Pint::get_n_bytes();
-		printf("PINT bits: %d bytes: %d\n", Pint::get_n_bits(), Pint::get_n_bytes());
+		// printf("PINT bits: %d bytes: %d\n", Pint::get_n_bits(), Pint::get_n_bytes());
 	}
 
 	//SeedManager::SetSeed(time(NULL));
@@ -1311,6 +1334,8 @@ int main(int argc, char *argv[])
 	}
 
 	topof.close();
+    Ptr<FlowMonitor> monitor;
+    monitor = flowmon.InstallAll();
 
 	// // schedule buffer monitor
 	// FILE* qlen_output = fopen(qlen_mon_file.c_str(), "w");
@@ -1329,12 +1354,145 @@ int main(int argc, char *argv[])
 
 	Simulator::Stop(Seconds(simulator_stop_time));
 	Simulator::Run();
+    Monitor_flow(monitor);    
+
 	Simulator::Destroy();
 	NS_LOG_INFO("Done.");
 	// fclose(trace_output);
 
 	endt = clock();
-	std::cout << "elapsed time: " << (double)(endt - begint) / CLOCKS_PER_SEC << "\n";
-    std::cout << "total flow: " << total_flow_num << std::endl;
-    std::cout << "average fct: " << total_fct / total_flow_num << std::endl;
+   
+}
+
+void Monitor_flow(Ptr<FlowMonitor> monitor){
+    uint64_t SentPackets = 0;
+    uint64_t ReceivedPackets = 0;
+    uint64_t LostPackets = 0;
+
+    uint64_t flowid = 0;
+    double AvgThroughput = 0;
+    Time Jitter;
+    Time Delay;
+
+    uint64_t numofflow = 0;
+    uint64_t SizeofallFCT = 0;
+    std::vector<uint64_t> FCTofflows;
+    std::vector<uint64_t> FCTofsmallflows;
+    std::vector<uint64_t> FCToflargeflows;
+    std::vector<FlowQuintet_t> flowQuintet;
+    uint64_t fct = 0;
+    bool isACK = false;
+
+    
+    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon.GetClassifier ());
+    std::map<FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats ();
+
+    for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator iter = stats.begin (); iter != stats.end (); ++iter){   
+        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow (iter->first);
+
+        FlowQuintet_t curr_flow;
+        curr_flow.srcAddr = t.sourceAddress;
+        curr_flow.dstAddr = t.destinationAddress;
+        curr_flow.srcPort = t.sourcePort;
+        curr_flow.dstPort = t.destinationPort;
+
+        isACK = false;
+        //isACK? 判断该条流是不是其他流的ACK，判断条件：源目的ip跟端口刚好相反
+        for(std::vector<FlowQuintet_t>::iterator it = flowQuintet.begin (); it != flowQuintet.end (); ++it){
+            if(curr_flow.srcAddr == it->dstAddr 
+             &&curr_flow.dstAddr == it->srcAddr
+             &&curr_flow.srcPort == it->dstPort
+             &&curr_flow.dstPort == it->srcPort
+             ){
+                //匹配成功，说明为ACK，删除该匹配条目
+                flowQuintet.erase(it);
+                isACK = true;
+                break;                
+            }
+        }
+        
+        //识别ACK失败则说明是常规流，正常记录下来
+        if(!isACK){
+            
+            flowQuintet.push_back(curr_flow);
+            // 计算fct
+            fct = (iter->second.timeLastRxPacket - iter->second.timeFirstTxPacket).GetSeconds ()*1e9;
+            // if(0<=fct&&fct<1000000000){
+                SizeofallFCT += fct;
+                numofflow ++;
+                FCTofflows.push_back(fct);
+                //区分大小流
+                if( iter->second.txBytes <= 1024*1024){
+                    FCTofsmallflows.push_back(fct);
+                }
+                else if(iter->second.txBytes >= 10*1024*1024){
+                    FCToflargeflows.push_back(fct);
+                }
+
+                SentPackets = SentPackets +(iter->second.txPackets);
+                ReceivedPackets = ReceivedPackets + (iter->second.rxPackets);
+                LostPackets = LostPackets + (iter->second.txPackets-iter->second.rxPackets);
+                AvgThroughput = AvgThroughput + (iter->second.rxBytes * 8.0/(iter->second.timeLastRxPacket.GetSeconds() - iter->second.timeFirstTxPacket.GetSeconds())/1024/1024/1024);
+                Delay = Delay + (iter->second.delaySum);
+                Jitter = Jitter + (iter->second.jitterSum);
+
+                flowid ++;        
+
+            // }
+        }
+
+    }
+
+    uint64_t avgsmallfct = 0;
+    uint64_t avglargefct = 0;
+    uint64_t sizeofsmallfct = 0;
+    uint64_t fct_99 = 0, fct_95 = 0, avgfct = 0;
+
+    if(numofflow) {
+        AvgThroughput = AvgThroughput/flowid;
+        // monitor->SerializeToXmlFile("manet-routing.xml", true, true);
+
+        //Calculated and print fct
+        avgfct = SizeofallFCT/numofflow; //ns
+
+        if ( FCTofsmallflows.size() )
+        {
+            for(uint64_t i =0; i<FCTofsmallflows.size();++i)
+            {
+                sizeofsmallfct += FCTofsmallflows[i];
+            }
+            avgsmallfct = sizeofsmallfct/FCTofsmallflows.size();                     
+        }
+
+        uint64_t sizeoflargefct = 0;
+        if ( FCToflargeflows.size() )
+        {
+            for(uint64_t i =0; i<FCToflargeflows.size();++i)
+            {
+                sizeoflargefct += FCToflargeflows[i];
+            }
+            avglargefct = sizeoflargefct/FCToflargeflows.size();
+        }
+
+        //Calculated 99th fct
+        sort(FCTofflows.begin(),FCTofflows.end());
+
+        if(FCTofflows.size()) {
+            float ratio = 0.99;
+            int pos = ratio*FCTofflows.size();
+            fct_99 = FCTofflows[pos-1]; //ns
+            ratio = 0.95;
+            pos = ratio*FCTofflows.size();
+            fct_95 = FCTofflows[pos-1]; //ns        
+        }
+
+        NS_LOG_UNCOND("average fct: " << avgfct / 1e3 << " ms");    //int64
+        NS_LOG_UNCOND("average large fct: " << avglargefct / 1e3 << " ms");   //int64
+        NS_LOG_UNCOND("average small fct: " << avgsmallfct / 1e6 << " us");   //int64
+        NS_LOG_UNCOND("99th fct: " << fct_99 / 1e3  << " ms");             //int64
+        NS_LOG_UNCOND("average throughput: " << AvgThroughput << " Gbps");   //double
+        NS_LOG_UNCOND("average delay: " << Delay.GetMicroSeconds() << " us");  //int64 GetNanoSeconds       
+        NS_LOG_UNCOND("packet loss ratio: " << ((LostPackets*10000)/SentPackets)<< " %..");
+    }
+
 }

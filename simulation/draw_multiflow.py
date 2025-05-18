@@ -42,24 +42,28 @@ with open(throughput4_file_path, 'r', encoding='utf-8') as file:
         throughputs4.append(float(throughput))                        
 
 # 创建图表
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(3, 2))
 plt.rcParams['font.family'] = 'Times New Roman'
 # 设置坐标轴字体大小和样式
-plt.tick_params(axis='both', which='major', labelsize=30)  # 调整刻度字体大小
+plt.tick_params(axis='both', which='major', labelsize=10.5)  # 调整刻度字体大小
 # 移除边距
 plt.margins(x=0, y=0)
 # 减少留白
-plt.subplots_adjust(left=0.05, right=0.99)
-plt.subplots_adjust(bottom=0.07, top=0.99)
+plt.subplots_adjust(left=0.08, right=0.99)
+plt.subplots_adjust(bottom=0.11, top=0.99)
 # 避免科学计数法
 # plt.ticklabel_format(style='plain')
 
 # 绘制网络吞吐量曲线
 plt.ylim(0, 11)
-plt.plot(times1, throughputs1, color='r', linewidth=3, label='flow1')
-plt.plot(times2, throughputs2, color='g', linewidth=3, label='flow2')
-plt.plot(times3, throughputs3, color='b', linewidth=3, label='flow3')
-plt.plot(times4, throughputs4, color='y', linewidth=3, label='flow4')
+# plt.xlim(0, 11)
+# plt.xticks([0, 200, 400, 600, 800, 1000, 1200, 1400])
+plt.xticks([0, 2, 4, 6, 8])
+plt.yticks([0, 2, 4, 6, 8, 10])
+plt.plot(times1, throughputs1, color='r', linewidth=1.5, label='flow1')
+plt.plot(times2, throughputs2, color='g', linewidth=1.5, label='flow2')
+plt.plot(times3, throughputs3, color='b', linewidth=1.5, label='flow3')
+plt.plot(times4, throughputs4, color='y', linewidth=1.5, label='flow4')
 
 # # 显示图例
 # plt.legend(fontsize=16, loc='upper right')
@@ -68,4 +72,4 @@ plt.plot(times4, throughputs4, color='y', linewidth=3, label='flow4')
 # plt.xticks(rotation=45)
 
 # 保存图表到文件
-plt.savefig('convergence.png')
+plt.savefig('convergence.png', dpi=600)

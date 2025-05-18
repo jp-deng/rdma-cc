@@ -9,7 +9,7 @@ cd ..
 cd traffic_gen
 param_load=$1
 param_time=0.1
-param_cdf=FbHdp
+param_cdf=WebSearch
 traffic_file="${param_cdf}_${param_load}_${param_time}.txt"
 if [ ! -f $traffic_file ]; then
     python traffic_gen.py -c ${param_cdf}.txt -l $param_load -t $param_time -o $traffic_file
@@ -17,7 +17,7 @@ fi
 cd ..
 
 cd simulation
-param_cc=timely
-param_mp=none
+param_cc=dcqcn
+param_mp=newmp
 python run.py --trace ${param_cdf}_${param_load}_${param_time} --topo spine_leaf --cc ${param_cc} --mp ${param_mp}
 cd ..

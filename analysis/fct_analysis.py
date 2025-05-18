@@ -24,7 +24,7 @@ def process_file(file_path):
             all_fct.append(fct_value)
             packets.append(packet_size)
 
-            if packet_size >= 10 * 1024 * 1024:  # 10M in bytes
+            if packet_size >= 100* 1024:  # 10M in bytes
                 large_flow_fct.append(fct_value)
             elif packet_size <= 100 * 1024:  # 100K in bytes
                 small_flow_fct.append(fct_value)
@@ -52,11 +52,11 @@ if __name__=="__main__":
     parser = OptionParser()
 
     parser.add_option("-m", "--traffic_mode", dest="traffic_mode",
-                      help="traffic_mode parameter value", default="WebSearch")
+                      help="traffic_mode parameter value", default="FbHdp")
     parser.add_option("-l", "--traffic_load", dest="traffic_load",
-                      help="Value for the traffic_load parameter", default="0.8")
+                      help="Value for the traffic_load parameter", default="0.3")
     parser.add_option("-c", "--congestion_control", dest="congestion_control",
-                      help="congestion_control parameter value", default="dcqcn")
+                      help="congestion_control parameter value", default="mprpdma")
 
     options,args = parser.parse_args()
     file_path = "../simulation/mix/fct_spine_leaf_{}_{}_0.1_{}.txt".format(options.traffic_mode, options.traffic_load, options.congestion_control)

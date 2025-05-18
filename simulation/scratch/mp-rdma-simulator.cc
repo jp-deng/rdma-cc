@@ -173,7 +173,7 @@ void qp_finish(FILE* fout, Ptr<MpRdmaQueuePair> q){
 	// sip, dip, sport, dport, size (B), start_time, fct (ns), standalone_fct (ns)
 	fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts);
     total_flow_num++;
-    printf("%d:: %08x %08x %u %u %lu %lu %lu %lu %lu\n", total_flow_num, q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts);
+    printf("              %d: %08x %08x %u %u %lu %lu %lu %lu %lu\n", total_flow_num, q->sip.Get(), q->dip.Get(), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct, q->lostpkts);
 	fflush(fout);
 
     total_fct += (Simulator::Now() - q->startTime).GetTimeStep();

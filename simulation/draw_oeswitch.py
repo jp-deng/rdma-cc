@@ -2,10 +2,10 @@
 import matplotlib.pyplot as plt
 
 # 文件路径
-hpcc_throughput_file_path = 'rate_hpcc.txt'
-dcqcn_throughput_file_path = 'rate_dcqcn.txt'
-timely_throughput_file_path = 'rate_timely.txt'
-newcc_throughput_file_path = 'rate_newcc.txt'
+hpcc_throughput_file_path = 'rate_log1.txt'
+# dcqcn_throughput_file_path = 'rate_dcqcn.txt'
+# timely_throughput_file_path = 'rate_timely.txt'
+# newcc_throughput_file_path = 'rate_newcc.txt'
 intervals_file_path = 'link_log.txt'
 
 # 从 throughput.txt 文件中读取数据
@@ -28,26 +28,26 @@ with open(hpcc_throughput_file_path, 'r', encoding='utf-8') as file:
             hpcc_times.append(int(time) - start_index)
             hpcc_throughputs.append(float(throughput))
 
-with open(timely_throughput_file_path, 'r', encoding='utf-8') as file:
-    for line in file:
-        time, throughput = line.split(': ')
-        if int(time) >= start_index and int(time) <= end_index:
-            timely_times.append(int(time)  - start_index)
-            timely_throughputs.append(float(throughput))
+# with open(timely_throughput_file_path, 'r', encoding='utf-8') as file:
+#     for line in file:
+#         time, throughput = line.split(': ')
+#         if int(time) >= start_index and int(time) <= end_index:
+#             timely_times.append(int(time)  - start_index)
+#             timely_throughputs.append(float(throughput))
 
-with open(dcqcn_throughput_file_path, 'r', encoding='utf-8') as file:
-    for line in file:
-        time, throughput = line.split(': ')
-        if int(time) >= start_index and int(time) <= end_index:
-            dcqcn_times.append(int(time)  - start_index)
-            dcqcn_throughputs.append(float(throughput))
+# with open(dcqcn_throughput_file_path, 'r', encoding='utf-8') as file:
+#     for line in file:
+#         time, throughput = line.split(': ')
+#         if int(time) >= start_index and int(time) <= end_index:
+#             dcqcn_times.append(int(time)  - start_index)
+#             dcqcn_throughputs.append(float(throughput))
 
-with open(newcc_throughput_file_path, 'r', encoding='utf-8') as file:
-    for line in file:
-        time, throughput = line.split(': ')
-        if int(time) >= start_index and int(time) <= end_index:
-            newcc_times.append(int(time)  - start_index)
-            newcc_throughputs.append(float(throughput))   
+# with open(newcc_throughput_file_path, 'r', encoding='utf-8') as file:
+#     for line in file:
+#         time, throughput = line.split(': ')
+#         if int(time) >= start_index and int(time) <= end_index:
+#             newcc_times.append(int(time)  - start_index)
+#             newcc_throughputs.append(float(throughput))   
 
 # 从 intervals.txt 文件中读取数据
 time_intervals = []
@@ -72,10 +72,10 @@ plt.subplots_adjust(bottom=0.1, top=0.95)
 plt.ticklabel_format(style='plain')
 
 # 绘制网络吞吐量曲线
-# plt.plot(hpcc_times, hpcc_throughputs, color='r', linewidth=3)
+plt.plot(hpcc_times, hpcc_throughputs, color='r', linewidth=3)
 # plt.plot(timely_times, timely_throughputs, color='r', linewidth=3)
 # plt.plot(dcqcn_times, dcqcn_throughputs, color='r', linewidth=3)
-plt.plot(newcc_times, newcc_throughputs, color='r', linewidth=3)
+# plt.plot(newcc_times, newcc_throughputs, color='r', linewidth=3)
 
 # # 绘制时间区间阴影
 for start_time, end_time in time_intervals:
@@ -90,4 +90,4 @@ for start_time, end_time in time_intervals:
 # plt.xticks(rotation=45)
 
 # 保存图表到文件
-plt.savefig('convergence.png')
+plt.savefig('convergence.png', dpi=600)

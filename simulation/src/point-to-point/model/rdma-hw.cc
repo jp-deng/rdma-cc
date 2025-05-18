@@ -14,6 +14,7 @@
 #include "cn-header.h"
 #include "ns3/path-id-tag.h"
 #include "ns3/path-rtt-tag.h"
+#include "ns3/timestamp-tag.h"
 #include <fstream>
 
 namespace ns3{
@@ -355,7 +356,9 @@ int RdmaHw::ReceiveUdp(Ptr<Packet> p, CustomHeader &ch){
 	int x = 0;
     PathIdTag t;
     p->PeekPacketTag(t);
-
+    TimestampTag tt;
+    p->PeekPacketTag(tt);
+    rxQp->delaySum += (Simulator::Now().GetTimeStep() - tt.GetTimestamp());
     // std::cout << "recv " << t.GetPathId() << " " << ch.udp.pathSeq << std::endl;
 
     if(m_mp_mode)
@@ -411,7 +414,7 @@ int RdmaHw::ReceiveCnp(Ptr<Packet> p, CustomHeader &ch){
 	// We assume, without verify, the packet is destinated to me
 	uint32_t qIndex = ch.cnp.qIndex;
 	if (qIndex == 1){		//DCTCP
-		std::cout << "TCP--ignore\n";
+		// std::cout << "TCP--ignore\n";
 		return 0;
 	}
 	uint16_t udpport = ch.cnp.fid; // corresponds to the sport
@@ -422,8 +425,8 @@ int RdmaHw::ReceiveCnp(Ptr<Packet> p, CustomHeader &ch){
 	uint32_t i;
 	// get qp
 	Ptr<RdmaQueuePair> qp = GetQp(ch.sip, udpport, qIndex);
-	if (qp == NULL)
-		std::cout << "ERROR: QCN NIC cannot find the flow\n";
+	// if (qp == NULL)
+	// 	std::cout << "ERROR: QCN NIC cannot find the flow\n";
 	// get nic
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
@@ -476,8 +479,8 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
-	if (m_ack_interval == 0)
-		std::cout << "ERROR: shouldn't receive ack\n";
+	// if (m_ack_interval == 0)
+	// 	std::cout << "ERROR: shouldn't receive ack\n";
 	else {
 		if (!m_backto0){
             if(m_mp_mode)   qp->Acknowledge(pathId, ch.ack.pathSeq);
@@ -492,7 +495,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 	}
 	if (ch.l3Prot == 0xFD)  {
         // NACK 
-        std::cout << "nack-------\n";
+        // std::cout << "nack-------\n";
         qp->lostpkts++;
         if(m_mp_mode)   RecoverQueue(pathId, qp);
 		else    RecoverQueue(qp);
@@ -675,6 +678,7 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp){
         qp->path_snd_nxt[pathId] += payload_size;
     }
     p->AddPacketTag (PathIdTag (pathId)); 
+    p->AddPacketTag (TimestampTag (Simulator::Now().GetTimeStep())); 
 
 	p->AddHeader (seqTs);
 	// add udp header

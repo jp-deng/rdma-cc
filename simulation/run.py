@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import nutils
 
 config_template="""ENABLE_QCN 1
 USE_DYNAMIC_PFC_THRESHOLD 1
@@ -19,7 +20,7 @@ CC_MODE {mode}
 MP_MODE {mp_mode}
 ALPHA_RESUME_INTERVAL {t_alpha}
 RATE_DECREASE_INTERVAL {t_dec}
-CLAMP_TARGET_RATE 0
+CLAMP_TARGET_RATE 0 
 RP_TIMER {t_inc}
 EWMA_GAIN {g}
 FAST_RECOVERY_TIMES 1
@@ -61,11 +62,13 @@ QLEN_MON_FILE mix/qlen_{topo}_{trace}_{cc}{failure}.txt
 QLEN_MON_START 2000000000
 QLEN_MON_END 3000000000
 """
+
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='run simulation')
-	parser.add_argument('--cc', dest='cc', action='store', default='newcc', help="congestion control")
+	parser.add_argument('--cc', dest='cc', action='store', default='dcqcn', help="congestion control")
 	parser.add_argument('--mp', dest='mp', action='store', default='none', help="multi path")
-	parser.add_argument('--trace', dest='trace', action='store', default='ManyToOne', help="the name of the flow file")
+	parser.add_argument('--trace', dest='trace', action='store', default='oeswitch', help="the name of the flow file")
 	parser.add_argument('--bw', dest="bw", action='store', default='10', help="the NIC bandwidth")
 	parser.add_argument('--down', dest='down', action='store', default='0 0 0', help="link down event")
 	parser.add_argument('--topo', dest='topo', action='store', default='spine_leaf', help="the name of the topology file")
@@ -87,6 +90,13 @@ if __name__ == "__main__":
 	pint_log_base=args.pint_log_base
 	pint_prob = args.pint_prob
 	enable_tr = args.enable_tr
+	load = ''
+	traffic = ''
+
+	parts = args.trace.split('_')
+	if len(parts) >= 2:
+		traffic = parts[0]
+		load = parts[1]
 
 	failure = ''
 	if args.down != '0 0 0':
@@ -95,6 +105,14 @@ if __name__ == "__main__":
 	kmax_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 400*bw/25, bw*4*1000000000, 400*bw*4/25, bw*10*1000000000, 400*bw*10/25)
 	kmin_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 100*bw/25, bw*4*1000000000, 100*bw*4/25, bw*10*1000000000, 100*bw*10/25)
 	pmax_map = "3 %d %.2f %d %.2f %d %.2f"%(bw*1000000000, 0.2, bw*4*1000000000, 0.2, bw*10*1000000000, 0.2)
+
+	# if trace == "multismallflow" or trace == "multismallflow":
+	# 	if args.cc == "hp":
+	# 		args.cc = "hpccPint"
+	# if trace == "oeswitch":
+	# 	topo = "spine_leaf_test"
+	# 	if args.cc == "newcc":
+	# 		args.cc = "hpccPint"
 
 	mp_mode = 0
 	output_file = "%s_%s_%s"%(topo, trace, args.cc)
@@ -175,9 +193,16 @@ if __name__ == "__main__":
 	with open(config_name, "w") as file:
 		file.write(config)
 	
+	ret = 1
 	if args.mp == "mprdma":
-		os.system("sudo ./waf --run 'scratch/mp-rdma-simulator %s'"%(config_name))
+		ret = os.system("sudo ./waf --run 'scratch/mp-rdma-simulator %s'"%(config_name))
 		# os.system("sudo ./waf --run scratch/mp-rdma-simulator --command-template=\"gdb --args %%s %s \" "%(config_name))
 	else:
 		# os.system("sudo ./waf --run scratch/rdma-simulator --command-template=\"gdb --args %%s %s \" "%(config_name))
-		os.system("sudo ./waf --run 'scratch/rdma-simulator %s'"%(config_name))
+		ret = os.system("sudo ./waf --run 'scratch/rdma-simulator %s'"%(config_name))
+	
+	# if ret == 0:
+	nutils.process(args.mp, traffic, args.cc, load)		
+
+
+

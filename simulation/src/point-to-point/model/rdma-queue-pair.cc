@@ -221,6 +221,7 @@ RdmaRxQueuePair::RdmaRxQueuePair(){
     path_ReceiverNextExpectedSeq[0] = path_ReceiverNextExpectedSeq[1] = 0;
     path_lastNACK[0] = path_lastNACK[1] = 0;
     path_nackTimer[0] = path_nackTimer[1] = Time(0);
+    delaySum = 0;
 }
 
 uint32_t RdmaRxQueuePair::GetHash(void){
