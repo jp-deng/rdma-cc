@@ -479,7 +479,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch){
 
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
-	// if (m_ack_interval == 0)
+	if (m_ack_interval == 0){}
 	// 	std::cout << "ERROR: shouldn't receive ack\n";
 	else {
 		if (!m_backto0){

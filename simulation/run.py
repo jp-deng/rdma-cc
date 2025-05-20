@@ -106,13 +106,13 @@ if __name__ == "__main__":
 	kmin_map = "3 %d %d %d %d %d %d"%(bw*1000000000, 100*bw/25, bw*4*1000000000, 100*bw*4/25, bw*10*1000000000, 100*bw*10/25)
 	pmax_map = "3 %d %.2f %d %.2f %d %.2f"%(bw*1000000000, 0.2, bw*4*1000000000, 0.2, bw*10*1000000000, 0.2)
 
-	# if trace == "multismallflow" or trace == "multismallflow":
-	# 	if args.cc == "hp":
-	# 		args.cc = "hpccPint"
-	# if trace == "oeswitch":
-	# 	topo = "spine_leaf_test"
-	# 	if args.cc == "newcc":
-	# 		args.cc = "hpccPint"
+	if trace == "multismallflow" or trace == "multilargeflow":
+		if args.cc == "hp":
+			args.cc = "hpccPint"
+	if trace == "oeswitch":
+		topo = "spine_leaf_test"
+		if args.cc == "newcc":
+			args.cc = "hpccPint"
 
 	mp_mode = 0
 	output_file = "%s_%s_%s"%(topo, trace, args.cc)
@@ -201,8 +201,8 @@ if __name__ == "__main__":
 		# os.system("sudo ./waf --run scratch/rdma-simulator --command-template=\"gdb --args %%s %s \" "%(config_name))
 		ret = os.system("sudo ./waf --run 'scratch/rdma-simulator %s'"%(config_name))
 	
-	# if ret == 0:
-	nutils.process(args.mp, traffic, args.cc, load)		
+	if ret == 0:
+		nutils.process(args.mp, traffic, args.cc, load)		
 
 
 
